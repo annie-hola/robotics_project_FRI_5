@@ -15,11 +15,12 @@ setup(
     zip_safe=True,
     maintainer='ubuntu',
     maintainer_email='anhanhanh151199@gmail.com',
-    description='TODO: Package description',
+    description='Chase Avoid Robot Controller',
     license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'chase_avoid_robot = chase_avoid_robot.main:main',
         ],
     },
 )
