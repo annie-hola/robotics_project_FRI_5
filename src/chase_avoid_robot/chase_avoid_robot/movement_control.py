@@ -5,6 +5,7 @@ from geometry_msgs.msg import Twist
 class MovementControl(Node):
     def __init__(self):
         super().__init__('movement_control')
+        self.get_logger().info("Movement Control Node Initialized")
         self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
 
     def move_forward(self, speed):

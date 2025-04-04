@@ -9,6 +9,7 @@ class SensorFSM(Node):
 
     def __init__(self):
         super().__init__('sensor_fsm')
+        self.get_logger().info("Sensor Control Node Initialized")
         self.current_state = self.RANDOM_ROAMING
         self.lidar_sub = self.create_subscription(
             LaserScan,

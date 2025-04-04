@@ -6,16 +6,22 @@ Robot has two modes, chase and avoid. Robot will run around randomly until it de
 
 ## Steps to Run
 
+Build package
+
 ```
 colcon build
 ```
+
+Source changes
 
 ```
 source install/setup.bash
 ```
 
+Run the node
+
 ```
-ros2 launch chase_avoid_robot chase_avoid_robot
+ros2 run chase_avoid_robot chase_avoid_robot
 ```
 
 ## Directory Structure

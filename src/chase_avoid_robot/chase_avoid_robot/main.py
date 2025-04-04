@@ -6,13 +6,13 @@ from chase_avoid_robot.behavior_logic import BehaviorLogic
 def main(args=None):
     rclpy.init(args=args)
 
-    fsm = SensorFSM()
-    movement = MovementControl()
-    behavior = BehaviorLogic(fsm, movement)
+    fsm = SensorFSM() # Initialize the state machine
+    movement = MovementControl() # Initialize the movement control
+    behavior = BehaviorLogic(fsm, movement) # Initialize the behavior logic
 
     try:
         while rclpy.ok():
-            rclpy.spin_once(fsm, timeout_sec=0.1)
+            rclpy.spin_once(fsm, timeout_sec=0.1) # spin the state machine every 0.1 seconds
             behavior.execute_behavior()
     except KeyboardInterrupt:
         pass
