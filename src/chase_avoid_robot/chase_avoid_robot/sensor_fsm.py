@@ -43,6 +43,22 @@ class SensorFSM(Node):
         if self.current_state == self.RANDOM_ROAMING:
             if max_value > 20:
                 self.set_state(self.START_CHASING)
+        
+        elif self.current_state == self.START_CHASING:
+            self.set_state(self.CHASING)
+        
+        elif self.current_state == self.CHASING:
+            if max_value > 500:
+                self.set_state(self.START_AVOIDING)
+            elif max_value < 20:
+                self.set_state(self.RANDOM_ROAMING)
+        
+        elif self.current_state == self.START_AVOIDING:
+            if max_value < 20:
+                self.set_state(self.AVOIDING)
+        
+        elif self.current_state == self.AVOIDING:
+            self.set_state(self.RANDOM_ROAMING)
             
 
 

@@ -142,11 +142,12 @@ class BehaviorLogic:
 
     def start_avoiding(self):
         self.movement.stop()
+        self.movement.move_backward(1.)
+        time.sleep(10.)
+        self.movement.stop()
+
+
+    def avoiding(self):
         self.movement.turn_left(2.)
         time.sleep(10.)
         self.stop()
-
-    def avoiding(self):
-        self.movement.move_forward(1.)
-        time.sleep(10)
-        self.movement.stop()
