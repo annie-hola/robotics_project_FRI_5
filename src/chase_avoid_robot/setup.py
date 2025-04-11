@@ -18,8 +18,9 @@ setup(
     license='MIT',
     tests_require=['pytest'],
     entry_points={
-        'console_scripts': [
-            'chase_avoid_main = chase_avoid_robot.main:main'
+        'console_scripts': [         
+            'chase_avoid_robot = chase_avoid_robot.main:main',
+            # script: package.file:function in file
         ],
     },
 )

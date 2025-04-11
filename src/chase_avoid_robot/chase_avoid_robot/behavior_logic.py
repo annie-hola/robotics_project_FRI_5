@@ -7,9 +7,12 @@ class BehaviorLogic:
     def __init__(self, fsm: SensorFSM, movement: MovementControl):
         self.fsm = fsm
         self.movement = movement
+        self.dir = "NULL"
+        self.count = 0
 
     def execute_behavior(self):
         state = self.fsm.get_state()
+        self.fsm.get_logger().info(f"Executing state: {state}")
         if state == SensorFSM.RANDOM_ROAMING:
             self.roaming()
         elif state == SensorFSM.CHASING:
@@ -18,36 +21,50 @@ class BehaviorLogic:
             self.avoiding()
 
     def roaming(self):
-        direction = random.choice(['left', 'right'])
-        #speed = 0.2 #m/s from 0.2 to 1.0 maximum
-        turn_speed = 0.0 # rad/s 0.5 - 2.0
+        direction = 'left' # random.choice(['left', 'right'])
+        speed = 1. # m/s from 0.2 to 1.0 maximum
+        turn_speed = 0.1*self.count # rad/s 0.5 - 2.0
 
-        turn_speed = random.uniform(0.0, 2.0)
+        self.movement.move_forward(speed)
         if direction == 'left':
-            self.movement.turn_left(1.0)
+            self.movement.turn_left(turn_speed)
         else: 
-            self.movement.turn_right(1.0)
-        time.sleep(turn_speed)
-
-        self.movement.move_forward(0.2)
-        time.sleep(2.0)
-        self.movement.stop()
+            self.movement.turn_right(turn_speed)
+        self.count+=1
+        time.sleep(0.5)
 
 
-    def chase_object(self, distance, angle):
-        if distance > 0.5:
-            speed = min(distance * 0.5, 1.0)
-            self.movement.set_speed(speed)
-            self.movement.set_turn(angle)
-        else:
-            self.movement.set_speed(0.1)
+    def chase_object(self):
+        speed = 1.
+        turn_speed = 2.
+        direction = self.fsm.get_direction()
+        self.movement.move_forward(speed)
+
+        if direction == "ir_intensity_side_left":
+            self.movement.turn_left(1.0*turn_speed)
+
+        if direction == "ir_intensity_left":
+            self.movement.turn_left(0.7*turn_speed)
+
+        if direction == "ir_intensity_front_left":
+            self.movement.turn_left(0.4*turn_speed)
+
+        if direction == "ir_intensity_front_center_left":
+            self.movement.turn_left(0.2*turn_speed)
+
+        if direction == "ir_intensity_front_center_right":
+            self.movement.turn_right(0.2*turn_speed)
+
+        if direction == "ir_intensity_front_right":
+            self.movement.turn_right(0.4*turn_speed)
+
+        if direction == "ir_intensity_right":
+            self.movement.turn_right(0.7*turn_speed)
+        time.sleep(0.5)
+
 
 
     def avoiding(self):
-        direction = random.choice(['left', 'right'])
-
-        self.movement.move_backward(0.5)
-        time.sleep(1.5)
         self.movement.stop()
         if direction == 'left':
             self.movement.turn_left(1.0)
@@ -57,4 +74,5 @@ class BehaviorLogic:
         self.movement.stop()
         self.movement.move_forward(0.6)
         time.sleep(2) #adjust later
+
         self.movement.stop()

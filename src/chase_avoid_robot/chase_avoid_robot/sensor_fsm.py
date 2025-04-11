@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import LaserScan
+from irobot_create_msgs.msg import IrIntensityVector
 
 class SensorFSM(Node):
     RANDOM_ROAMING = "RANDOM_ROAMING"
@@ -9,20 +9,31 @@ class SensorFSM(Node):
 
     def __init__(self):
         super().__init__('sensor_fsm')
+        self.get_logger().info("Sensor Control Node Initialized")
         self.current_state = self.RANDOM_ROAMING
+        self.dir = "NULL"
         self.lidar_sub = self.create_subscription(
-            LaserScan,
-            '/scan',
+            IrIntensityVector,
+            '/ir_intensity',
             self.process_lidar_data,
             10
         )
 
     def process_lidar_data(self, msg):
         # Example: Process LiDAR data and update state
-        closest_distance = min(msg.ranges)
-        if closest_distance < 0.5:
+        max_value = 0
+        max_id = "NULL"
+        for reading in msg.readings:
+            value = reading.value
+            if value >= max_value:
+                max_value = value
+                max_id = reading.header.frame_id
+
+        self.get_logger().info(f"Lidar max value: {max_value}")
+        self.dir = max_id
+        if max_value > 300:
             self.set_state(self.AVOIDING)
-        elif closest_distance < 2.0:
+        elif max_value > 50:
             self.set_state(self.CHASING)
         else:
             self.set_state(self.RANDOM_ROAMING)
@@ -33,3 +44,6 @@ class SensorFSM(Node):
 
     def get_state(self):
         return self.current_state
+    
+    def get_direction(self):
+        return self.dir
