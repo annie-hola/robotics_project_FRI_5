@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
+from irobot_create_msgs.msg import InterfaceButtons, HazardDetectionVector
 
 class SensorFSM(Node):
     RANDOM_ROAMING = "RANDOM_ROAMING"
@@ -11,22 +12,55 @@ class SensorFSM(Node):
         super().__init__('sensor_fsm')
         self.get_logger().info("Sensor Control Node Initialized")
         self.current_state = self.RANDOM_ROAMING
+        self.mode = self.CHASING  # Default mode
+
         self.lidar_sub = self.create_subscription(
             LaserScan,
             '/scan',
             self.process_lidar_data,
             10
         )
+        self.button_sub = self.create_subscription(
+            InterfaceButtons,
+            '/joy',
+            self.handle_button_press,
+            10
+        )
+        self.bumper_sub = self.create_subscription(
+            HazardDetectionVector,
+            '/bumper_status',
+            self.handle_bumper_event,
+            10
+        )
 
     def process_lidar_data(self, msg):
-        # Example: Process LiDAR data and update state
+        # Ensure LiDAR data is valid and update state
+        if not msg.ranges:
+            self.get_logger().warn("No LiDAR data received")
+            return
+
         closest_distance = min(msg.ranges)
         if closest_distance < 0.5:
-            self.set_state(self.AVOIDING)
-        elif closest_distance < 2.0:
-            self.set_state(self.CHASING)
+            self.set_state(self.AVOIDING if self.mode == self.AVOIDING else self.CHASING)
         else:
             self.set_state(self.RANDOM_ROAMING)
+
+    def handle_button_press(self, msg):
+        # Cycle between CHASING and AVOIDING modes
+        if msg.button_1.is_pressed:
+            self.mode = self.AVOIDING if self.mode == self.CHASING else self.CHASING
+            self.get_logger().info(f"Mode switched to: {self.mode}")
+
+    def handle_bumper_event(self, msg):
+        # Ensure bumper events are handled correctly
+        if msg.detections:
+            if self.current_state == self.CHASING:
+                self.mode = self.AVOIDING  # Switch to AVOIDING mode if chasing
+                self.set_state(self.AVOIDING)
+                self.get_logger().info(f"Mode switched to: {self.mode} due to collision")
+            else:
+                self.mode = self.CHASING if self.mode == self.AVOIDING else self.AVOIDING
+                self.get_logger().info(f"Mode toggled to: {self.mode} due to collision")
 
     def set_state(self, state):
         self.get_logger().info(f"Transitioning to state: {state}")

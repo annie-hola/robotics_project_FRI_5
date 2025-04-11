@@ -10,29 +10,28 @@ class BehaviorLogic:
 
     def execute_behavior(self):
         state = self.fsm.get_state()
+        self.fsm.get_logger().debug(f"Executing behavior for state: {state}")
         if state == SensorFSM.RANDOM_ROAMING:
-            self.roaming(self.movement)
+            self.roaming()
         elif state == SensorFSM.CHASING:
             self.movement.move_forward(0.5)
         elif state == SensorFSM.AVOIDING:
-            self.avoiding(self.movement)
+            self.avoiding()
 
     def roaming(self):
         direction = random.choice(['left', 'right'])
-        #speed = 0.2 #m/s from 0.2 to 1.0 maximum
-        turn_speed = 0.0 # rad/s 0.5 - 2.0
+        turn_speed = random.uniform(0.5, 2.0)  # Adjusted range for better turning
+        self.fsm.get_logger().debug(f"Roaming: Turning {direction} for {turn_speed} seconds")
 
-        turn_speed = random.uniform(0.0, 2.0)
         if direction == 'left':
             self.movement.turn_left(1.0)
-        else: 
+        else:
             self.movement.turn_right(1.0)
         time.sleep(turn_speed)
 
         self.movement.move_forward(0.2)
         time.sleep(2.0)
         self.movement.stop()
-
 
     def chase_object(self, distance, angle):
         if distance > 0.5:
@@ -42,9 +41,9 @@ class BehaviorLogic:
         else:
             self.movement.set_speed(0.1)
 
-
     def avoiding(self):
         direction = random.choice(['left', 'right'])
+        self.fsm.get_logger().debug(f"Avoiding: Moving backward and turning {direction}")
 
         self.movement.move_backward(0.5)
         time.sleep(1.5)
@@ -52,9 +51,9 @@ class BehaviorLogic:
         if direction == 'left':
             self.movement.turn_left(1.0)
         else:
-            self.movement.turn_rigt(1.0)
-        time.sleep(1) #adjust later
+            self.movement.turn_right(1.0)
+        time.sleep(1.0)
         self.movement.stop()
         self.movement.move_forward(0.6)
-        time.sleep(2) #adjust later
+        time.sleep(2.0)
         self.movement.stop()
