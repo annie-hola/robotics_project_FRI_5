@@ -14,6 +14,7 @@ def main(args=None):
         while rclpy.ok():
             rclpy.spin_once(fsm, timeout_sec=0.1)
             behavior.execute_behavior()
+            print("Main loop running...")
     except KeyboardInterrupt:
         pass
     finally:

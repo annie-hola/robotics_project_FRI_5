@@ -11,11 +11,11 @@ class BehaviorLogic:
     def execute_behavior(self):
         state = self.fsm.get_state()
         if state == SensorFSM.RANDOM_ROAMING:
-            self.roaming(self.movement)
+            self.roaming()
         elif state == SensorFSM.CHASING:
-            self.movement.move_forward(0.5)
+            self.chase_object(0.6, 1.0)
         elif state == SensorFSM.AVOIDING:
-            self.avoiding(self.movement)
+            self.avoiding()
 
     def roaming(self):
         direction = random.choice(['left', 'right'])
@@ -52,7 +52,7 @@ class BehaviorLogic:
         if direction == 'left':
             self.movement.turn_left(1.0)
         else:
-            self.movement.turn_rigt(1.0)
+            self.movement.turn_right(1.0)
         time.sleep(1) #adjust later
         self.movement.stop()
         self.movement.move_forward(0.6)
