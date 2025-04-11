@@ -3,6 +3,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
 from irobot_create_msgs.msg import InterfaceButtons, HazardDetectionVector
 from irobot_create_msgs.msg import IrIntensityVector
+from rclpy.qos import qos_profile_sensor_data
 
 class SensorFSM(Node):
     RANDOM_ROAMING = "RANDOM_ROAMING"
@@ -19,22 +20,23 @@ class SensorFSM(Node):
             IrIntensityVector,
             '/Robot5/ir_intensity',
             self.process_lidar_data,
-            10
+            qos_profile_sensor_data
         )
         self.button_sub = self.create_subscription(
             InterfaceButtons,
             '/Robot5/joy',
             self.handle_button_press,
-            10
+            qos_profile_sensor_data
         )
         self.bumper_sub = self.create_subscription(
             HazardDetectionVector,
             '/Robot5/hazard_detection',
             self.handle_bumper_event,
-            10
+            qos_profile_sensor_data
         )
 
     def process_lidar_data(self, msg):
+        self.get_logger().info("aaaaaaaa")
         # Ensure LiDAR data is valid and update state
         closest_distance = 0
         max_id = "NULL"
@@ -46,6 +48,8 @@ class SensorFSM(Node):
         self.dir = max_id
         self.get_logger().info(f"Lidar max value: {closest_distance}")
 
+
+        self.get_logger().info(f"{closest_distance}")
         if closest_distance > 20:
             self.set_state(self.AVOIDING if self.mode == self.AVOIDING else self.CHASING)
         else:
