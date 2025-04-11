@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from irobot_create_msgs.msg import IrIntensityVector
+import time
 
 class SensorFSM(Node):
     RANDOM_ROAMING = "RANDOM_ROAMING"
@@ -39,6 +40,8 @@ class SensorFSM(Node):
             self.set_state(self.CHASING)
         else:
             self.set_state(self.RANDOM_ROAMING)"""
+        self.dir = max_id
+        self.get_logger().info(f"Lidar max value: {max_value}")
         
         if self.current_state == self.RANDOM_ROAMING:
             if max_value > 20:
@@ -54,10 +57,10 @@ class SensorFSM(Node):
                 self.set_state(self.RANDOM_ROAMING)
         
         elif self.current_state == self.START_AVOIDING:
-            if max_value < 20:
-                self.set_state(self.AVOIDING)
+            self.set_state(self.AVOIDING)
         
         elif self.current_state == self.AVOIDING:
+            time.sleep(10)
             self.set_state(self.RANDOM_ROAMING)
             
 
