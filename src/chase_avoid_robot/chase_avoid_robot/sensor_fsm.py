@@ -29,7 +29,7 @@ class SensorFSM(Node):
         )
         self.bumper_sub = self.create_subscription(
             HazardDetectionVector,
-            '/bumper_status',
+            '/hazard_detection',
             self.handle_bumper_event,
             10
         )
