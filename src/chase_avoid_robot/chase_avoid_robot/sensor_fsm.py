@@ -4,7 +4,9 @@ from irobot_create_msgs.msg import IrIntensityVector
 
 class SensorFSM(Node):
     RANDOM_ROAMING = "RANDOM_ROAMING"
+    START_CHASING = "START_CHASING"
     CHASING = "CHASING"
+    START_AVOIDING = "START_AVOIDING"
     AVOIDING = "AVOIDING"
 
     def __init__(self):
@@ -28,7 +30,7 @@ class SensorFSM(Node):
             if value >= max_value:
                 max_value = value
                 max_id = reading.header.frame_id
-
+        """
         self.get_logger().info(f"Lidar max value: {max_value}")
         self.dir = max_id
         if max_value > 500:
@@ -36,7 +38,13 @@ class SensorFSM(Node):
         elif max_value > 20:
             self.set_state(self.CHASING)
         else:
-            self.set_state(self.RANDOM_ROAMING)
+            self.set_state(self.RANDOM_ROAMING)"""
+        
+        if self.current_state == self.RANDOM_ROAMING:
+            if max_value > 20:
+                self.set_state(self.START_CHASING)
+            
+
 
     def set_state(self, state):
         self.get_logger().info(f"Transitioning to state: {state}")
