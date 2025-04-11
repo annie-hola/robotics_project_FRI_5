@@ -31,9 +31,9 @@ class SensorFSM(Node):
 
         self.get_logger().info(f"Lidar max value: {max_value}")
         self.dir = max_id
-        if max_value > 300:
+        if max_value > 500:
             self.set_state(self.AVOIDING)
-        elif max_value > 50:
+        elif max_value > 20:
             self.set_state(self.CHASING)
         else:
             self.set_state(self.RANDOM_ROAMING)
