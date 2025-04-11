@@ -17,19 +17,19 @@ class SensorFSM(Node):
         self.dir = "NULL"
         self.lidar_sub = self.create_subscription(
             IrIntensityVector,
-            '/ir_intensity',
+            '/Robot5/ir_intensity',
             self.process_lidar_data,
             10
         )
         self.button_sub = self.create_subscription(
             InterfaceButtons,
-            '/joy',
+            '/Robot5/joy',
             self.handle_button_press,
             10
         )
         self.bumper_sub = self.create_subscription(
             HazardDetectionVector,
-            '/hazard_detection',
+            '/Robot5/hazard_detection',
             self.handle_bumper_event,
             10
         )

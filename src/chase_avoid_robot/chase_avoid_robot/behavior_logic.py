@@ -19,7 +19,7 @@ class BehaviorLogic:
             self.avoiding()
 
     def roaming(self):
-        direction = random.choice(['left', 'right'])
+        direction = 'left' #random.choice(['left', 'right'])
         turn_speed = random.uniform(0.5, 2.0)  # Adjusted range for better turning
         self.fsm.get_logger().debug(f"Roaming: Turning {direction} for {turn_speed} seconds")
 
