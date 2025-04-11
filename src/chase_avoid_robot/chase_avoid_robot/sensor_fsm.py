@@ -2,6 +2,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
 from irobot_create_msgs.msg import InterfaceButtons, HazardDetectionVector
+from irobot_create_msgs.msg import IrIntensityVector
 
 class SensorFSM(Node):
     RANDOM_ROAMING = "RANDOM_ROAMING"
@@ -13,10 +14,10 @@ class SensorFSM(Node):
         self.get_logger().info("Sensor Control Node Initialized")
         self.current_state = self.RANDOM_ROAMING
         self.mode = self.CHASING  # Default mode
-
+        self.dir = "NULL"
         self.lidar_sub = self.create_subscription(
-            LaserScan,
-            '/scan',
+            IrIntensityVector,
+            '/ir_intensity',
             self.process_lidar_data,
             10
         )
@@ -35,12 +36,17 @@ class SensorFSM(Node):
 
     def process_lidar_data(self, msg):
         # Ensure LiDAR data is valid and update state
-        if not msg.ranges:
-            self.get_logger().warn("No LiDAR data received")
-            return
+        closest_distance = 0
+        max_id = "NULL"
+        for reading in msg.readings:
+            value = reading.value
+            if value >= closest_distance:
+                closest_distance = value
+                max_id = reading.header.frame_id
+        self.dir = max_id
+        self.get_logger().info(f"Lidar max value: {closest_distance}")
 
-        closest_distance = min(msg.ranges)
-        if closest_distance < 0.5:
+        if closest_distance > 20:
             self.set_state(self.AVOIDING if self.mode == self.AVOIDING else self.CHASING)
         else:
             self.set_state(self.RANDOM_ROAMING)
