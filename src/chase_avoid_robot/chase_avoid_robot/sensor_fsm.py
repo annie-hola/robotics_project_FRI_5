@@ -3,6 +3,7 @@ from rclpy.node import Node
 from rclpy.actions import ActionClient
 from sensor_msgs.msg import LaserScan
 from irobot_create_msgs.msg import InterfaceButtons, HazardDetectionVector
+from irobot_create_msgs.msg import LightringLeds, LedColor
 from irobot_create_msgs.msg import IrIntensityVector
 from irobot_create_msgs.action import Undock
 from rclpy.qos import qos_profile_sensor_data
@@ -25,6 +26,8 @@ class SensorFSM(Node):
         self.current_state = State.UNINITIALIZED
         self.mode = State.CHASING  # Default mode
         self.dir = "NULL"
+        
+        self.led_publisher = self.create_publisher(LightringLeds, '/cmd_lightring', 10)
         
     def intialize(self):
         self.get_logger().info("Initializing...")
@@ -116,9 +119,30 @@ class SensorFSM(Node):
                 self.mode = State.CHASING if self.mode == State.AVOIDING else State.AVOIDING
                 self.get_logger().info(f"Mode toggled to: {self.mode} due to collision")
 
+
+    def set_led_color(self, red, green, blue):
+        msg = LightringLeds()
+
+        color = LedColor()
+        color.red = int(red * 255)
+        color.green = int(green * 255)
+        color.blue = int(blue * 255)
+
+        msg.leds = [color] * 6 
+        self.led_publisher.publish(msg)  # Publish the message to the cmd_lightring topic
+
     def set_state(self, state):
         self.get_logger().info(f"Transitioning to state: {state}")
         self.current_state = state
+        
+        if state == State.RANDOM_ROAMING:
+            self.set_led_color(0.0, 1.0, 0.0)  # Green for RANDOM_ROAMING
+        elif state == State.CHASING:
+            self.set_led_color(1.0, 0.0, 0.0)  # Red for CHASING
+        elif state == State.AVOIDING:
+            self.set_led_color(0.0, 0.0, 1.0)  # Blue for AVOIDING
+        else:
+            self.set_led_color(1.0, 1.0, 1.0)  # White for other states
 
     def get_state(self):
         return self.current_state
