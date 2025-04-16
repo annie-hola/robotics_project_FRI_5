@@ -19,7 +19,8 @@ class State(Enum):
     RANDOM_ROAMING = 2
     CHASING = 3
     AVOIDING = 4
-    DOCKING = 5 
+    PUSHING = 5
+    DOCKING = 6 
 class SensorFSM(Node):
     UNINITIALIZED= -1
     INITIALIZED = 0
@@ -32,7 +33,7 @@ class SensorFSM(Node):
         super().__init__('sensor_fsm')
         self.get_logger().info("Sensor Control Node Initialized")
         self.current_state = State.UNINITIALIZED
-        self.active_state = [State.RANDOM_ROAMING, State.CHASING, State.AVOIDING]
+        self.active_state = [State.RANDOM_ROAMING, State.CHASING, State.AVOIDING, State.PUSHING]
         self.mode = State.CHASING  # Default mode
         self.dir = "NULL"
         self.distance = 1000
@@ -151,10 +152,17 @@ class SensorFSM(Node):
         max_value = 0
         max_id = "NULL"
         for reading in msg.readings:
+            # Skip the dock
+            if "dock" in reading.header.frame_id:
+                self.get_logger().info("Dock detected. Avoiding interaction.")
+                continue
+            
+            # Find the object with the maximum value (hiqhest intensity)
             value = reading.value
             if value >= max_value:
                 max_value = value
                 max_id = reading.header.frame_id
+                
         self.set_distance_angle(max_value, max_id)
         self.get_logger().info(f"Lidar value, angle, distance: {max_value}, {self.angle}, {self.distance}")
 
