@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from rclpy.actions import ActionClient
+from rclpy.action import ActionClient
 from sensor_msgs.msg import LaserScan
 from irobot_create_msgs.msg import InterfaceButtons, HazardDetectionVector
 from irobot_create_msgs.msg import LightringLeds, LedColor
@@ -21,6 +21,12 @@ class State(Enum):
     AVOIDING = 4
     DOCKING = 5 
 class SensorFSM(Node):
+    UNINITIALIZED= -1
+    INITIALIZED = 0
+    UNDOCK = 1
+    RANDOM_ROAMING = 2
+    CHASING = 3
+    AVOIDING = 4
 
     def __init__(self):
         super().__init__('sensor_fsm')
@@ -29,6 +35,8 @@ class SensorFSM(Node):
         self.active_state = [State.RANDOM_ROAMING, State.CHASING, State.AVOIDING]
         self.mode = State.CHASING  # Default mode
         self.dir = "NULL"
+        self.distance = 1000
+        self.angle = 0
         
         # Exploration timer to return to dock
         self.exploration_timer = None
@@ -39,7 +47,7 @@ class SensorFSM(Node):
         
     def intialize(self):
         self.get_logger().info("Initializing...")
-        self.set_state(State.INITIALIZED)
+        self.set_state(self.INITIALIZED)
         
         # Start counting the exploration time
         self.exploration_start_time = self.get_clock().now()
@@ -82,7 +90,7 @@ class SensorFSM(Node):
             self.get_logger().error("Docking failed!")
         
     def perform_undock(self):
-        self.set_state(State.UNDOCK)
+        self.set_state(self.UNDOCK)
 
         undock_client = ActionClient(self, Undock, '/undock')
 
@@ -109,7 +117,7 @@ class SensorFSM(Node):
             return
         else:
             self.get_logger().info("Undocking succeeded!")
-            self.set_state(State.RANDOM_ROAMING)  # Transition to RANDOM_ROAMING after successful undocking
+            self.set_state(self.RANDOM_ROAMING)  # Transition to RANDOM_ROAMING after successful undocking
 
         self.initialize_subscriptions()
 
@@ -133,22 +141,20 @@ class SensorFSM(Node):
             return
         
         # Ensure LiDAR data is valid and update state
-        closest_distance = 0
+        max_value = 0
         max_id = "NULL"
         for reading in msg.readings:
             value = reading.value
-            if value >= closest_distance:
-                closest_distance = value
+            if value >= max_value:
+                max_value = value
                 max_id = reading.header.frame_id
-        self.dir = max_id
-        self.get_logger().info(f"Lidar max value: {closest_distance}")
+        self.set_distance_angle(max_value, max_id)
+        self.get_logger().info(f"Lidar value, angle, distance: {max_value}, {self.angle}, {self.distance}")
 
-
-        self.get_logger().info(f"{closest_distance}")
-        if closest_distance > 20:
-            self.set_state(State.AVOIDING if self.mode == State.AVOIDING else State.CHASING)
+        if max_value > 20:
+            self.set_state(self.AVOIDING if self.mode == self.AVOIDING else self.CHASING)
         else:
-            self.set_state(State.RANDOM_ROAMING)
+            self.set_state(self.RANDOM_ROAMING)
 
     def handle_bumper_event(self, msg):
         if self.current_state not in self.active_state:
@@ -156,12 +162,12 @@ class SensorFSM(Node):
         
         # Ensure bumper events are handled correctly
         if msg.detections:
-            if self.current_state == State.CHASING:
-                self.mode = State.AVOIDING  # Switch to AVOIDING mode if chasing
-                self.set_state(State.AVOIDING)
+            if self.current_state == self.CHASING:
+                self.mode = self.AVOIDING  # Switch to AVOIDING mode if chasing
+                self.set_state(self.AVOIDING)
                 self.get_logger().info(f"Mode switched to: {self.mode} due to collision")
             else:
-                self.mode = State.CHASING if self.mode == State.AVOIDING else State.AVOIDING
+                self.mode = self.CHASING if self.mode == self.AVOIDING else self.AVOIDING
                 self.get_logger().info(f"Mode toggled to: {self.mode} due to collision")
 
 
@@ -180,14 +186,33 @@ class SensorFSM(Node):
         self.get_logger().info(f"Transitioning to state: {state}")
         self.current_state = state
         
-        if state == State.RANDOM_ROAMING:
+        if state == self.RANDOM_ROAMING:
             self.set_led_color(0.0, 1.0, 0.0)  # Green for RANDOM_ROAMING
-        elif state == State.CHASING:
+        elif state == self.CHASING:
             self.set_led_color(1.0, 0.0, 0.0)  # Red for CHASING
-        elif state == State.AVOIDING:
+        elif state == self.AVOIDING:
             self.set_led_color(0.0, 0.0, 1.0)  # Blue for AVOIDING
         else:
             self.set_led_color(1.0, 1.0, 1.0)  # White for other states
 
     def get_state(self):
         return self.current_state
+    
+    def set_distance_angle(self, max_val, dir):
+        if max_val < 20:
+            self.angle = 0
+        elif dir == "ir_intensity_side_left":
+            self.angle = 90
+        elif dir == "ir_intensity_left":
+            self.angle = 60
+        elif dir == "ir_intensity_front_left":
+            self.angle = 30
+        elif dir == "ir_intensity_front_center_left":
+            self.angle = 10
+        elif dir == "ir_intensity_front_center_right":
+            self.angle = -10
+        elif dir == "ir_intensity_front_right":
+            self.angle = -30
+        elif dir == "ir_intensity_right":
+            self.angle = -60
+        self.distance = 15/max_val
