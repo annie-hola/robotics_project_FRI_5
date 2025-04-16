@@ -31,7 +31,8 @@ class SensorFSM(Node):
         self.get_logger().info("Sensor Control Node Initialized")
         self.current_state = self.UNINITIALIZED
         self.mode = self.CHASING  # Default mode
-        self.dir = "NULL"
+        self.distance = 1000
+        self.angle = 0
         
         self.led_publisher = self.create_publisher(LightringLeds, '/cmd_lightring', 10)
         
@@ -94,19 +95,17 @@ class SensorFSM(Node):
             return
         
         # Ensure LiDAR data is valid and update state
-        closest_distance = 0
+        max_value = 0
         max_id = "NULL"
         for reading in msg.readings:
             value = reading.value
-            if value >= closest_distance:
-                closest_distance = value
+            if value >= max_value:
+                max_value = value
                 max_id = reading.header.frame_id
-        self.dir = max_id
-        self.get_logger().info(f"Lidar max value: {closest_distance}")
+        self.set_distance_angle(max_value, max_id)
+        self.get_logger().info(f"Lidar value, angle, distance: {max_value}, {self.angle}, {self.distance}")
 
-
-        self.get_logger().info(f"{closest_distance}")
-        if closest_distance > 20:
+        if max_value > 20:
             self.set_state(self.AVOIDING if self.mode == self.AVOIDING else self.CHASING)
         else:
             self.set_state(self.RANDOM_ROAMING)
@@ -152,3 +151,22 @@ class SensorFSM(Node):
 
     def get_state(self):
         return self.current_state
+    
+    def set_distance_angle(self, max_val, dir):
+        if max_val < 20:
+            self.angle = 0
+        elif dir == "ir_intensity_side_left":
+            self.angle = 90
+        elif dir == "ir_intensity_left":
+            self.angle = 60
+        elif dir == "ir_intensity_front_left":
+            self.angle = 30
+        elif dir == "ir_intensity_front_center_left":
+            self.angle = 10
+        elif dir == "ir_intensity_front_center_right":
+            self.angle = -10
+        elif dir == "ir_intensity_front_right":
+            self.angle = -30
+        elif dir == "ir_intensity_right":
+            self.angle = -60
+        self.distance = 15/max_val
