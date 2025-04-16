@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from rclpy.action import ActionClient
+from rclpy.actions import ActionClient
 from sensor_msgs.msg import LaserScan
 from irobot_create_msgs.msg import InterfaceButtons, HazardDetectionVector
 from irobot_create_msgs.msg import LightringLeds, LedColor
@@ -19,31 +19,25 @@ class State(Enum):
     CHASING = 3
     AVOIDING = 4
 class SensorFSM(Node):
-    UNINITIALIZED= -1
-    INITIALIZED = 0
-    UNDOCK = 1
-    RANDOM_ROAMING = 2
-    CHASING = 3
-    AVOIDING = 4
 
     def __init__(self):
         super().__init__('sensor_fsm')
         self.get_logger().info("Sensor Control Node Initialized")
-        self.current_state = self.UNINITIALIZED
-        self.mode = self.CHASING  # Default mode
+        self.current_state = State.UNINITIALIZED
+        self.mode = State.CHASING  # Default mode
         self.dir = "NULL"
         
         self.led_publisher = self.create_publisher(LightringLeds, '/cmd_lightring', 10)
         
     def intialize(self):
         self.get_logger().info("Initializing...")
-        self.set_state(self.INITIALIZED)
+        self.set_state(State.INITIALIZED)
         
         # Perform undocking after initialization
         self.perform_undock()
 
     def perform_undock(self):
-        self.set_state(self.UNDOCK)
+        self.set_state(State.UNDOCK)
 
         undock_client = ActionClient(self, Undock, '/undock')
 
@@ -70,7 +64,7 @@ class SensorFSM(Node):
             return
         else:
             self.get_logger().info("Undocking succeeded!")
-            self.set_state(self.RANDOM_ROAMING)  # Transition to RANDOM_ROAMING after successful undocking
+            self.set_state(State.RANDOM_ROAMING)  # Transition to RANDOM_ROAMING after successful undocking
 
         self.initialize_subscriptions()
 
@@ -90,7 +84,7 @@ class SensorFSM(Node):
         )
         
     def process_lidar_data(self, msg):
-        if self.current_state not in [self.RANDOM_ROAMING, self.CHASING, self.AVOIDING]:
+        if self.current_state not in [State.RANDOM_ROAMING, State.CHASING, State.AVOIDING]:
             return
         
         # Ensure LiDAR data is valid and update state
@@ -107,22 +101,22 @@ class SensorFSM(Node):
 
         self.get_logger().info(f"{closest_distance}")
         if closest_distance > 20:
-            self.set_state(self.AVOIDING if self.mode == self.AVOIDING else self.CHASING)
+            self.set_state(State.AVOIDING if self.mode == State.AVOIDING else State.CHASING)
         else:
-            self.set_state(self.RANDOM_ROAMING)
+            self.set_state(State.RANDOM_ROAMING)
 
     def handle_bumper_event(self, msg):
-        if self.current_state not in [self.RANDOM_ROAMING, self.CHASING, self.AVOIDING]:
+        if self.current_state not in [State.RANDOM_ROAMING, State.CHASING, State.AVOIDING]:
             return
         
         # Ensure bumper events are handled correctly
         if msg.detections:
-            if self.current_state == self.CHASING:
-                self.mode = self.AVOIDING  # Switch to AVOIDING mode if chasing
-                self.set_state(self.AVOIDING)
+            if self.current_state == State.CHASING:
+                self.mode = State.AVOIDING  # Switch to AVOIDING mode if chasing
+                self.set_state(State.AVOIDING)
                 self.get_logger().info(f"Mode switched to: {self.mode} due to collision")
             else:
-                self.mode = self.CHASING if self.mode == self.AVOIDING else self.AVOIDING
+                self.mode = State.CHASING if self.mode == State.AVOIDING else State.AVOIDING
                 self.get_logger().info(f"Mode toggled to: {self.mode} due to collision")
 
 
@@ -141,14 +135,20 @@ class SensorFSM(Node):
         self.get_logger().info(f"Transitioning to state: {state}")
         self.current_state = state
         
-        if state == self.RANDOM_ROAMING:
+        if state == State.RANDOM_ROAMING:
             self.set_led_color(0.0, 1.0, 0.0)  # Green for RANDOM_ROAMING
-        elif state == self.CHASING:
+        elif state == State.CHASING:
             self.set_led_color(1.0, 0.0, 0.0)  # Red for CHASING
-        elif state == self.AVOIDING:
+        elif state == State.AVOIDING:
             self.set_led_color(0.0, 0.0, 1.0)  # Blue for AVOIDING
         else:
             self.set_led_color(1.0, 1.0, 1.0)  # White for other states
 
     def get_state(self):
         return self.current_state
+
+    def get_angle(self):
+        return getattr(self, 'last_detected_angle', 0.0)
+
+    def get_distance(self):
+        return getattr(self, 'last_detected_distance', 0.5)
