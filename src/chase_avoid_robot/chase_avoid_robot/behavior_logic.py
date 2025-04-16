@@ -61,3 +61,27 @@ class BehaviorLogic:
         self.movement.move_forward(0.6)
         time.sleep(2.0)
         self.movement.stop()
+        
+        # TODO: Resume roaming after avoiding
+        # self.fsm.set_state(SensorFSM.RANDOM_ROAMING)
+        
+    def handle_hazard(self):
+        self.fsm.get_logger().info("Handling hazard...")
+        self.movement.stop()
+
+        # Move backward to avoid the hazard
+        self.movement.move_backward(0.3)
+        time.sleep(1.5)
+        self.movement.stop()
+
+        # Turn away from the hazard
+        direction = random.choice(['left', 'right'])
+        if direction == 'left':
+            self.movement.turn_left(1.0)
+        else:
+            self.movement.turn_right(1.0)
+        time.sleep(1.0)
+        self.movement.stop()
+
+        # Resume roaming after avoiding the hazard
+        self.fsm.set_state(SensorFSM.RANDOM_ROAMING)

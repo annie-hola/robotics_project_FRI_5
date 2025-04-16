@@ -57,7 +57,7 @@ class SensorFSM(Node):
 
     def check_exploration_timeout(self):
         if self.current_state in self.active_state:
-            if self.exploration_start_time:
+            if self.exploration_start_time :
                 # Check if the exploration duration has elapsed
                 elapsed_time = (self.get_clock().now() - self.exploration_start_time).nanoseconds * 1e-9
                 if elapsed_time > self.exploration_duration:
@@ -132,7 +132,14 @@ class SensorFSM(Node):
         self.bumper_sub = self.create_subscription(
             HazardDetectionVector,
             '/Robot5/hazard_detection',
-            self.handle_bumper_event,
+            self.process_bumper_event,
+            qos_profile_sensor_data
+        )
+        
+        self.hazard_sub = self.create_subscription(
+            HazardDetectionVector,
+            '/Robot5/hazard_detection',
+            self.process_hazard_data,
             qos_profile_sensor_data
         )
         
@@ -156,7 +163,18 @@ class SensorFSM(Node):
         else:
             self.set_state(self.RANDOM_ROAMING)
 
-    def handle_bumper_event(self, msg):
+    def process_hazard_data(self, msg):
+        if self.current_state not in self.active_state:
+            return
+
+        for hazard in msg.detections:
+            if hazard.type in [HazardDetectionVector.CLIFF, HazardDetectionVector.WHEEL_DROP]:
+                self.get_logger().warn(f"Hazard detected: {hazard.type}. Stopping the robot.")
+                self.set_state(State.AVOIDING)  # Transition to AVOIDING state
+                self.behavior_logic.handle_hazard() 
+                return
+            
+    def process_bumper_event(self, msg):
         if self.current_state not in self.active_state:
             return
         
