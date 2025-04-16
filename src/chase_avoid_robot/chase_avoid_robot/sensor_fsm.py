@@ -6,6 +6,7 @@ from irobot_create_msgs.msg import InterfaceButtons, HazardDetectionVector
 from irobot_create_msgs.msg import LightringLeds, LedColor
 from irobot_create_msgs.msg import IrIntensityVector
 from irobot_create_msgs.action import Undock
+from irobot_create_msgs.action import Dock
 from rclpy.qos import qos_profile_sensor_data
 
 from enum import Enum
@@ -18,14 +19,21 @@ class State(Enum):
     RANDOM_ROAMING = 2
     CHASING = 3
     AVOIDING = 4
+    DOCKING = 5 
 class SensorFSM(Node):
 
     def __init__(self):
         super().__init__('sensor_fsm')
         self.get_logger().info("Sensor Control Node Initialized")
         self.current_state = State.UNINITIALIZED
+        self.active_state = [State.RANDOM_ROAMING, State.CHASING, State.AVOIDING]
         self.mode = State.CHASING  # Default mode
         self.dir = "NULL"
+        
+        # Exploration timer to return to dock
+        self.exploration_timer = None
+        self.exploration_duration = 180.0 # 3 mins
+        self.create_timer(1.0, self.check_exploration_timeout)
         
         self.led_publisher = self.create_publisher(LightringLeds, '/cmd_lightring', 10)
         
@@ -33,9 +41,46 @@ class SensorFSM(Node):
         self.get_logger().info("Initializing...")
         self.set_state(State.INITIALIZED)
         
+        # Start counting the exploration time
+        self.exploration_start_time = self.get_clock().now()
+        
         # Perform undocking after initialization
         self.perform_undock()
 
+    def check_exploration_timeout(self):
+        if self.current_state in self.active_state:
+            if self.exploration_start_time:
+                # Check if the exploration duration has elapsed
+                elapsed_time = (self.get_clock().now() - self.exploration_start_time).nanoseconds * 1e-9
+                if elapsed_time > self.exploration_duration:
+                    self.perform_dock()
+    
+    def perform_dock(self):
+        self.set_state(State.DOCKING)
+        
+        dock_client = ActionClient(self, Dock, '/dock')
+        
+        self.get_logger().info("Waiting for Dock action server...")
+        if not dock_client.wait_for_server(timeout_sec=10.0):
+            self.get_logger().error("Dock action server not available!")
+            return
+    
+        goal_msg = Dock.Goal()
+        future = dock_client.send_goal_async(goal_msg)
+
+        rclpy.spin_until_future_complete(self, future) # Wait for the goal to be accepted
+        if not future.result().accepted:
+            self.get_logger().error("Dock goal was rejected!")
+            return
+
+        result_future = future.result().get_result_async()
+        rclpy.spin_until_future_complete(self, result_future) # Wait for the result
+
+        if result_future.result().status == 4:
+            self.get_logger().info("Docking succeeded!")
+        else:
+            self.get_logger().error("Docking failed!")
+        
     def perform_undock(self):
         self.set_state(State.UNDOCK)
 
@@ -84,7 +129,7 @@ class SensorFSM(Node):
         )
         
     def process_lidar_data(self, msg):
-        if self.current_state not in [State.RANDOM_ROAMING, State.CHASING, State.AVOIDING]:
+        if self.current_state not in self.active_state:
             return
         
         # Ensure LiDAR data is valid and update state
@@ -106,7 +151,7 @@ class SensorFSM(Node):
             self.set_state(State.RANDOM_ROAMING)
 
     def handle_bumper_event(self, msg):
-        if self.current_state not in [State.RANDOM_ROAMING, State.CHASING, State.AVOIDING]:
+        if self.current_state not in self.active_state:
             return
         
         # Ensure bumper events are handled correctly
