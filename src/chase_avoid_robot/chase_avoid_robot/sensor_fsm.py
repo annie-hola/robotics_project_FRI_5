@@ -156,7 +156,7 @@ class SensorFSM(Node):
         self.set_distance_angle(max_value, max_id)
 
         if max_value > 20:
-            self.get_logger().info(f"Lidar value, angle, distance: {max_value}, {self.angle}, {self.distance}")
+            #self.get_logger().info(f"Lidar value, angle, distance: {max_value}, {self.angle}, {self.distance}")
             self.set_state(self.CHASING)
         else:
             self.set_state(self.RANDOM_ROAMING)
@@ -196,7 +196,7 @@ class SensorFSM(Node):
     def set_state(self, state):
         if self.current_state == self.AVOIDING:
             if time.time() - self.init_avoiding < 10:
-                self.get_logger().info(f"Staying to state: {state}")
+                self.get_logger().info(f"Staying to state: {self.current_state}")
                 return
         elif state == self.AVOIDING:
             self.init_avoiding = time.time()
