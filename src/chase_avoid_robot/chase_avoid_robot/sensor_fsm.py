@@ -133,16 +133,10 @@ class SensorFSM(Node):
         self.bumper_sub = self.create_subscription(
             HazardDetectionVector,
             '/Robot5/hazard_detection',
-            self.process_bumper_event,
+            self.process_hazard_detection,
             qos_profile_sensor_data
         )
-        
-        self.hazard_sub = self.create_subscription(
-            HazardDetectionVector,
-            '/Robot5/hazard_detection',
-            self.process_hazard_data,
-            qos_profile_sensor_data
-        )
+
         
     def process_lidar_data(self, msg):
         if self.current_state not in self.active_state:
@@ -163,31 +157,26 @@ class SensorFSM(Node):
             self.set_state(self.AVOIDING if self.mode == self.AVOIDING else self.CHASING)
         else:
             self.set_state(self.RANDOM_ROAMING)
-
-    def process_hazard_data(self, msg):
-        if self.current_state not in self.active_state:
-            return
-
-        for hazard in msg.detections:
-            if hazard.type in [HazardDetectionVector.CLIFF, HazardDetectionVector.WHEEL_DROP]:
-                self.get_logger().warn(f"Hazard detected: {hazard.type}. Stopping the robot.")
-                self.set_state(self.AVOIDING)  # Transition to AVOIDING state
-                self.behavior_logic.handle_hazard() 
-                return
             
-    def process_bumper_event(self, msg):
+    def process_hazard_detection(self, msg):
         if self.current_state not in self.active_state:
             return
         
-        # Ensure bumper events are handled correctly
         if msg.detections:
-            if self.current_state == self.CHASING:
-                self.mode = self.AVOIDING  # Switch to AVOIDING mode if chasing
-                self.set_state(self.AVOIDING)
-                self.get_logger().info(f"Mode switched to: {self.mode} due to collision")
-            else:
-                self.mode = self.CHASING if self.mode == self.AVOIDING else self.AVOIDING
-                self.get_logger().info(f"Mode toggled to: {self.mode} due to collision")
+            for hazard in msg.detections:
+                self.get_logger().warn(f"Hazard detected: {hazard.type}.")
+
+                # Handle CLIFF or WHEEL_DROP hazards
+                if hazard.type in [HazardDetectionVector.CLIFF, HazardDetectionVector.WHEEL_DROP]:
+                    self.get_logger().warn(f"Executing hazard handling.")
+                    self.behavior_logic.handle_hazard()
+                    return
+
+                # Handle BUMP hazards
+                elif hazard.type == HazardDetectionVector.BUMP:
+                    self.get_logger().info("Bump detected. Switching to AVOIDING state.")
+                    self.set_state(self.AVOIDING)
+                    return
 
 
     def set_led_color(self, red, green, blue):
