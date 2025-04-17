@@ -9,13 +9,17 @@ def main(args=None):
     fsm = SensorFSM() # Initialize the state machine
     movement = MovementControl() # Initialize the movement control
     behavior = BehaviorLogic(fsm, movement) # Initialize the behavior logic
-
+    fsm.behavior_logic = behavior
+    fsm.intialize()
+    
     try:
         while rclpy.ok():
             rclpy.spin_once(fsm, timeout_sec=0.1) # spin the state machine every 0.1 seconds
             behavior.execute_behavior()
+    except Exception as e:
+        fsm.get_logger().error(f"An error occurred: {e}")
     except KeyboardInterrupt:
-        pass
+        fsm.get_logger().info("Shutting down...")
     finally:
         fsm.destroy_node()
         movement.destroy_node()
