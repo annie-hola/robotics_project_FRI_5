@@ -7,6 +7,9 @@ class BehaviorLogic:
     def __init__(self, fsm: SensorFSM, movement: MovementControl):
         self.fsm = fsm
         self.movement = movement
+        self.roaming_mode = "forward"
+        self.roaming_start_time = time.time()
+        self.current_turn_direction = "left"
 
     def execute_behavior(self):
         state = self.fsm.get_state()
@@ -15,41 +18,40 @@ class BehaviorLogic:
             self.roaming()
         elif state == SensorFSM.CHASING:
             print("Should be chasing")
-            angle = self.fsm.get_angle()
-            distance = self.fsm.get_distance()
+            angle = self.fsm.angle
+            distance = self.fsm.distance
             self.chase_object(distance, angle)
                 # self.movement.move_forward(0.5)
         elif state == SensorFSM.AVOIDING:
             self.avoiding()
 
-    def roaming(self):
-        now = time.time()
+def roaming(self):
+    now = time.time()
+    if self.roaming_mode == "turning":
+        if now - self.roaming_start_time < 1.5:
+            if not hasattr(self, 'turning_started') or not self.turning_started:
+                if self.current_turn_direction == "left":
+                    self.movement.turn_left(1.0)
+                else:
+                    self.movement.turn_right(1.0)
+                self.turning_started = True 
+        else:
+            self.roaming_mode = "forward"
+            self.roaming_start_time = now
+            self.movement.stop()
+            self.turning_started = False
 
-        if self.roaming_mode == "turning":
-            if now - self.roaming_start_time < 1.5:
-                if not hasattr(self, 'turning_started') or not self.turning_started:
-                    if self.current_turn_direction == "left":
-                        self.movement.turn_left(1.0)
-                    else:
-                        self.movement.turn_right(1.0)
-                    self.turning_started = True
-            else:
-                self.roaming_mode = "forward"
-                self.roaming_start_time = now
-                self.movement.stop()
-                self.turning_started = False
-
-        elif self.roaming_mode == "forward":
-            if now - self.roaming_start_time < 2.0:
-                if not hasattr(self, 'forward_started') or not self.forward_started:
-                    self.movement.move_forward(0.5)
-                    self.forward_started = True
-            else:
-                self.roaming_mode = "turning"
-                self.roaming_start_time = now
-                self.movement.stop()
-                self.current_turn_direction = random.choice(["left", "right"])
-                self.forward_started = False
+    elif self.roaming_mode == "forward":
+        if now - self.roaming_start_time < 2.0:
+            if not hasattr(self, 'forward_started') or not self.forward_started:
+                self.movement.move_forward(0.5)
+                self.forward_started = True
+        else:
+            self.roaming_mode = "turning"
+            self.roaming_start_time = now
+            self.movement.stop()
+            self.current_turn_direction = random.choice(["left", "right"])
+            self.forward_started = False
 
 
     def chase_object(self, distance, angle):
