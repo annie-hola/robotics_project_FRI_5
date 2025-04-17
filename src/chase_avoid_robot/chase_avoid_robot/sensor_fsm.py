@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
 from sensor_msgs.msg import LaserScan
-from irobot_create_msgs.msg import InterfaceButtons, HazardDetectionVector
+from irobot_create_msgs.msg import InterfaceButtons, HazardDetection
 from irobot_create_msgs.msg import LightringLeds, LedColor
 from irobot_create_msgs.msg import IrIntensityVector
 from irobot_create_msgs.action import Undock
@@ -44,7 +44,7 @@ class SensorFSM(Node):
         self.exploration_duration = 180.0 # 3 mins
         self.create_timer(1.0, self.check_exploration_timeout)
         
-        self.led_publisher = self.create_publisher(LightringLeds, '/cmd_lightring', 10)
+        self.led_publisher = self.create_publisher(LightringLeds, '/Robot5/cmd_lightring', 10)
         
     def intialize(self):
         self.get_logger().info("Initializing...")
@@ -131,7 +131,7 @@ class SensorFSM(Node):
         )
 
         self.bumper_sub = self.create_subscription(
-            HazardDetectionVector,
+            HazardDetection,
             '/Robot5/hazard_detection',
             self.process_hazard_detection,
             qos_profile_sensor_data
@@ -167,13 +167,13 @@ class SensorFSM(Node):
                 self.get_logger().warn(f"Hazard detected: {hazard.type}.")
 
                 # Handle CLIFF or WHEEL_DROP hazards
-                if hazard.type in [HazardDetectionVector.CLIFF, HazardDetectionVector.WHEEL_DROP]:
+                if hazard.type in [HazardDetection.CLIFF, HazardDetection.WHEEL_DROP]:
                     self.get_logger().warn(f"Executing hazard handling.")
                     self.behavior_logic.handle_hazard()
                     return
 
                 # Handle BUMP hazards
-                elif hazard.type == HazardDetectionVector.BUMP:
+                elif hazard.type == HazardDetection.BUMP:
                     self.get_logger().info("Bump detected. Switching to AVOIDING state.")
                     self.set_state(self.AVOIDING)
                     return
