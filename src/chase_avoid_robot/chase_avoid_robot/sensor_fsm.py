@@ -27,13 +27,14 @@ class SensorFSM(Node):
     RANDOM_ROAMING = 2
     CHASING = 3
     AVOIDING = 4
+    DOCKING = 5
 
     def __init__(self):
         super().__init__('sensor_fsm')
         self.get_logger().info("Sensor Control Node Initialized")
-        self.current_state = State.UNINITIALIZED
-        self.active_state = [State.RANDOM_ROAMING, State.CHASING, State.AVOIDING]
-        self.mode = State.CHASING  # Default mode
+        self.current_state = self.UNINITIALIZED
+        self.active_state = [self.RANDOM_ROAMING, self.CHASING, self.AVOIDING]
+        self.mode = self.CHASING  # Default mode
         self.dir = "NULL"
         self.distance = 1000
         self.angle = 0
@@ -64,9 +65,9 @@ class SensorFSM(Node):
                     self.perform_dock()
     
     def perform_dock(self):
-        self.set_state(State.DOCKING)
+        self.set_state(self.DOCKING)
         
-        dock_client = ActionClient(self, Dock, '/dock')
+        dock_client = ActionClient(self, Dock, '/Robot5/dock')
         
         self.get_logger().info("Waiting for Dock action server...")
         if not dock_client.wait_for_server(timeout_sec=10.0):
@@ -92,7 +93,7 @@ class SensorFSM(Node):
     def perform_undock(self):
         self.set_state(self.UNDOCK)
 
-        undock_client = ActionClient(self, Undock, '/undock')
+        undock_client = ActionClient(self, Undock, '/Robot5/undock')
 
         self.get_logger().info("Waiting for Undock action server...")
         if not undock_client.wait_for_server(timeout_sec=10.0):
@@ -170,7 +171,7 @@ class SensorFSM(Node):
         for hazard in msg.detections:
             if hazard.type in [HazardDetectionVector.CLIFF, HazardDetectionVector.WHEEL_DROP]:
                 self.get_logger().warn(f"Hazard detected: {hazard.type}. Stopping the robot.")
-                self.set_state(State.AVOIDING)  # Transition to AVOIDING state
+                self.set_state(self.AVOIDING)  # Transition to AVOIDING state
                 self.behavior_logic.handle_hazard() 
                 return
             
