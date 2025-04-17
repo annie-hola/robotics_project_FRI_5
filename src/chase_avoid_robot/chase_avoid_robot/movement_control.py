@@ -41,3 +41,15 @@ class MovementControl(Node):
         # Ensure robot stops completely
         msg = Twist()
         self.cmd_vel_pub.publish(msg)
+
+    def set_speed(self, speed):
+        msg = Twist()
+        msg.linear.x = speed
+        msg.angular.z = 0.0
+        self.cmd_vel_pub.publish(msg)
+
+    def set_turn(self, angular_speed):
+        msg = Twist()
+        msg.linear.x = 0.0
+        msg.angular.z = angular_speed
+        self.cmd_vel_pub.publish(msg)
