@@ -27,23 +27,29 @@ class BehaviorLogic:
 
         if self.roaming_mode == "turning":
             if now - self.roaming_start_time < 1.5:
-                if self.current_turn_direction == "left":
-                    self.movement.turn_left(1.0)
-                else:
-                    self.movement.turn_right(1.0)
+                if not hasattr(self, 'turning_started') or not self.turning_started:
+                    if self.current_turn_direction == "left":
+                        self.movement.turn_left(1.0)
+                    else:
+                        self.movement.turn_right(1.0)
+                    self.turning_started = True
             else:
                 self.roaming_mode = "forward"
                 self.roaming_start_time = now
                 self.movement.stop()
+                self.turning_started = False
 
         elif self.roaming_mode == "forward":
             if now - self.roaming_start_time < 2.0:
-                self.movement.move_forward(0.5)
+                if not hasattr(self, 'forward_started') or not self.forward_started:
+                    self.movement.move_forward(0.5)
+                    self.forward_started = True
             else:
                 self.roaming_mode = "turning"
                 self.roaming_start_time = now
                 self.movement.stop()
                 self.current_turn_direction = random.choice(["left", "right"])
+                self.forward_started = False
 
 
     def chase_object(self, distance, angle):
