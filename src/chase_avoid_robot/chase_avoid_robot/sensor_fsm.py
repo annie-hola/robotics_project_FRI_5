@@ -8,6 +8,14 @@ from irobot_create_msgs.msg import IrIntensityVector
 from irobot_create_msgs.action import Undock
 from irobot_create_msgs.action import Dock
 from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import QoSProfile, ReliabilityPolicy, LivelinessPolicy, DurabilityPolicy
+
+qos_profile = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            liveliness=LivelinessPolicy.AUTOMATIC,
+            durability=DurabilityPolicy.VOLATILE,
+            depth=1
+        )
 
 from enum import Enum
 import time
@@ -47,7 +55,7 @@ class SensorFSM(Node):
         self.exploration_duration = 180.0 # 3 mins
         self.create_timer(1.0, self.check_exploration_timeout)
         
-        self.led_publisher = self.create_publisher(LightringLeds, '/Robot5/cmd_lightring', 10)
+        self.led_publisher = self.create_publisher(LightringLeds, '/Robot5/cmd_lightring', qos_profile)
         
     def intialize(self):
         self.get_logger().info("Initializing...")
@@ -181,18 +189,6 @@ class SensorFSM(Node):
                     self.set_state(self.AVOIDING)
                     return
 
-
-    def set_led_color(self, red, green, blue):
-        msg = LightringLeds()
-
-        color = LedColor()
-        color.red = int(red * 255)
-        color.green = int(green * 255)
-        color.blue = int(blue * 255)
-
-        msg.leds = [color] * 6 
-        self.led_publisher.publish(msg)  # Publish the message to the cmd_lightring topic
-
     def process_hazard_data(self, msg):
         if self.current_state not in self.active_state:
             return
@@ -219,16 +215,19 @@ class SensorFSM(Node):
                 self.get_logger().info(f"Mode toggled to: {self.mode} due to collision")
 
 
-    def set_led_color(self, red, green, blue):
+    def set_led_color(self, colors):
         msg = LightringLeds()
+        msg.override_system = True
+        
+        for color in colors:
+            led_color = LedColor()
+            led_color.red = color["red"]
+            led_color.green = color["green"]
+            led_color.blue = color["blue"]
+            msg.leds.append(led_color)
 
-        color = LedColor()
-        color.red = int(red * 255)
-        color.green = int(green * 255)
-        color.blue = int(blue * 255)
-
-        msg.leds = [color] * 6 
-        self.led_publisher.publish(msg)  # Publish the message to the cmd_lightring topic
+        print(f"Setting LED color: {msg.leds}")
+        self.led_publisher.publish(msg)
 
     def set_state(self, state):
         if self.current_state == self.AVOIDING:
@@ -242,11 +241,13 @@ class SensorFSM(Node):
             self.get_logger().info(f"Transitioning to state: {state}")
         
         if state == self.RANDOM_ROAMING:
-            self.set_led_color(0.0, 1.0, 0.0)  # Green for RANDOM_ROAMING
+            self.set_led_color([{"red": 0, "green": 255, "blue": 0}] * 6)  # Green for RANDOM_ROAMING
         elif state == self.CHASING:
-            self.set_led_color(1.0, 0.0, 0.0)  # Red for CHASING
+            self.set_led_color([{"red": 255, "green": 0, "blue": 0}] * 6)  # Red for CHASING
         elif state == self.AVOIDING:
-            self.set_led_color(0.0, 0.0, 1.0)  # Blue for AVOIDING
+            self.set_led_color([{"red": 0, "green": 0, "blue": 255}] * 6)  # Blue for AVOIDING
+        elif state == self.DOCKING:
+            self.set_led_color([{"red": 255, "green": 255, "blue": 0}] * 6)  # Yellow for DOCKING
         else:
             self.set_led_color(1.0, 1.0, 1.0)  # White for other states
 
