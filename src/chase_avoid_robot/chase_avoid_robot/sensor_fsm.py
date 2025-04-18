@@ -171,7 +171,8 @@ class SensorFSM(Node):
                 # Handle CLIFF or WHEEL_DROP hazards
                 if hazard.type in [HazardDetection.CLIFF, HazardDetection.WHEEL_DROP]:
                     self.get_logger().warn(f"Executing hazard handling.")
-                    self.behavior_logic.handle_hazard()
+                    # self.behavior_logic.handle_hazard()
+                    self.set_state(self.AVOIDING)
                     return
 
                 # Handle BUMP hazards

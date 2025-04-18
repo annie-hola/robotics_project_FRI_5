@@ -31,7 +31,7 @@ class BehaviorLogic:
         self.movement.turn_left(turn_speed)
 
     def chase_object(self, distance, angle):
-        speed = min(distance * 0.8, 1.0)
+        speed = min(distance * 2, 1.0)
         turn_speed = angle/90
         self.movement.turn_left(turn_speed)
         self.movement.move_forward(speed)
