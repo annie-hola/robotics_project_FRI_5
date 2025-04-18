@@ -68,6 +68,7 @@ class SensorFSM(Node):
     
     def perform_dock(self):
         self.set_state(self.DOCKING)
+
         
         dock_client = ActionClient(self, Dock, '/Robot5/dock')
         
@@ -186,11 +187,10 @@ class SensorFSM(Node):
         msg = LightringLeds()
         msg.override_system = True
         
-        for color in colors:
-            led_color = LedColor()
-            led_color.red = color["red"]
-            led_color.green = color["green"]
-            led_color.blue = color["blue"]
+        led_color = LedColor()
+        led_color.red = colors["red"]
+        led_color.green = colors["green"]
+        led_color.blue = colors["blue"]
 
         for _ in range(6):
             msg.leds.append(led_color)
