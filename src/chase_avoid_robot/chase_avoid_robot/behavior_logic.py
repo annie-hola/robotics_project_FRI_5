@@ -64,3 +64,17 @@ class BehaviorLogic:
 
         # Resume roaming after avoiding the hazard
         self.fsm.set_state(SensorFSM.RANDOM_ROAMING)
+
+            
+    def pushing(self):
+        self.fsm.get_logger().info("Pushing object")
+
+        # Move forward to push the object
+        self.movement.move_forward(0.5)
+        while True:
+            # Check if cliff sensors detect a drop
+            if self.fsm.current_state == SensorFSM.AVOIDING: 
+                self.fsm.get_logger().info("Cliff detected. Object likely pushed off.")
+                self.movement.stop()
+                self.fsm.set_state(SensorFSM.RANDOM_ROAMING)
+                break
