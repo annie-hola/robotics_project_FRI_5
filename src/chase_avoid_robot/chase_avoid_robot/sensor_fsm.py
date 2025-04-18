@@ -192,13 +192,11 @@ class SensorFSM(Node):
             led_color.blue = color["blue"]
             msg.leds.append(led_color)
 
-        print(f"Setting LED color: {msg.leds}")
         self.led_publisher.publish(msg)
 
     def set_state(self, state):
         if self.current_state == self.AVOIDING:
             if time.time() - self.init_avoiding < 10:
-                self.get_logger().info(f"Staying to state: {self.current_state}")
                 return
         elif state == self.AVOIDING:
             self.init_avoiding = time.time()
