@@ -25,13 +25,13 @@ class BehaviorLogic:
             self.avoiding()
 
     def roaming(self):
-        speed = 0.8
-        turn_speed = 1.
+        speed = 0.4
+        turn_speed = 2.
         self.movement.move_forward(speed)
         self.movement.turn_left(turn_speed)
 
     def chase_object(self, distance, angle):
-        speed = min(distance * 2, 1.0)
+        speed = min(distance * 0.8+ 0.1, 1.0)
         turn_speed = angle/90
         self.movement.turn_left(turn_speed)
         self.movement.move_forward(speed)
@@ -39,9 +39,8 @@ class BehaviorLogic:
     def avoiding(self):
         if not self.started_avoiding:
             self.started_avoiding = True
-            self.movement.stop()
         turn_speed = 2.
-        self.movement.turn_left(turn_speed)
+        self.movement.set_turn(turn_speed)
         
     def handle_hazard(self):
         self.fsm.get_logger().info("Handling hazard...")

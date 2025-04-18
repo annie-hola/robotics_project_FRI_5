@@ -43,7 +43,7 @@ class SensorFSM(Node):
         
         # Exploration timer to return to dock
         self.exploration_timer = None
-        self.exploration_duration = 180.0 # 3 mins
+        self.exploration_duration = 60.0 # 3 mins
         self.create_timer(1.0, self.check_exploration_timeout)
         
         self.led_publisher = self.create_publisher(LightringLeds, '/Robot5/cmd_lightring', 10)
