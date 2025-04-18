@@ -191,8 +191,10 @@ class SensorFSM(Node):
             led_color.red = color["red"]
             led_color.green = color["green"]
             led_color.blue = color["blue"]
-            msg.leds.append(led_color)
 
+        for _ in range(6):
+            msg.leds.append(led_color)
+    
         self.led_publisher.publish(msg)
 
     def set_state(self, state):
@@ -206,15 +208,15 @@ class SensorFSM(Node):
             self.get_logger().info(f"Transitioning to state: {state}")
         
         if state == self.RANDOM_ROAMING:
-            self.set_led_color([{"red": 0, "green": 255, "blue": 0}] * 6)  # Green for RANDOM_ROAMING
+            self.set_led_color({"red": 0, "green": 255, "blue": 0})  # Green for RANDOM_ROAMING
         elif state == self.CHASING:
-            self.set_led_color([{"red": 255, "green": 0, "blue": 0}] * 6)  # Red for CHASING
+            self.set_led_color({"red": 255, "green": 0, "blue": 0})  # Red for CHASING
         elif state == self.AVOIDING:
-            self.set_led_color([{"red": 0, "green": 0, "blue": 255}] * 6)  # Blue for AVOIDING
+            self.set_led_color({"red": 0, "green": 0, "blue": 255})  # Blue for AVOIDING
         elif state == self.DOCKING:
-            self.set_led_color([{"red": 255, "green": 255, "blue": 0}] * 6)  # Yellow for DOCKING
+            self.set_led_color({"red": 255, "green": 255, "blue": 0})  # Yellow for DOCKING
         else:
-            self.set_led_color([{"red": 255, "green": 255, "blue": 255}] * 6)  # White for other states
+            self.set_led_color({"red": 255, "green": 255, "blue": 255})  # White for other states
 
     def get_state(self):
         return self.current_state
