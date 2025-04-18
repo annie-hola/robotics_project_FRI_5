@@ -23,6 +23,8 @@ class BehaviorLogic:
                 # self.movement.move_forward(0.5)
         elif state == SensorFSM.AVOIDING:
             self.avoiding()
+        elif state == SensorFSM.PUSHING:
+            self.pushing()
 
     def roaming(self):
         speed = 1.0

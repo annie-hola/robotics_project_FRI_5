@@ -141,13 +141,17 @@ class SensorFSM(Node):
 
         
     def process_lidar_data(self, msg):
-        if self.current_state not in self.active_state:
+        if self.current_state not in [self.RANDOM_ROAMING, self.CHASING]:
             return
         
         # Ensure LiDAR data is valid and update state
         max_value = 0
         max_id = "NULL"
         for reading in msg.readings:
+            if "dock" in reading.header.frame_id:
+                self.get_logger().info("Dock detected")
+                continue
+            
             value = reading.value
             if value >= max_value:
                 max_value = value
@@ -156,7 +160,7 @@ class SensorFSM(Node):
 
         if max_value > 20:
             #self.get_logger().info(f"Lidar value, angle, distance: {max_value}, {self.angle}, {self.distance}")
-            self.set_state(self.CHASING)
+            self.set_state(self.PUSHING)
         else:
             self.set_state(self.RANDOM_ROAMING)
             
