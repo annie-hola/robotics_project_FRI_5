@@ -196,7 +196,7 @@ class SensorFSM(Node):
 
     def set_state(self, state):
         if self.current_state == self.AVOIDING:
-            if time.time() - self.init_avoiding < 10:
+            if time.time() - self.init_avoiding < 2:
                 return
         elif state == self.AVOIDING:
             self.init_avoiding = time.time()

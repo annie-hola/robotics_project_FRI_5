@@ -25,13 +25,13 @@ class BehaviorLogic:
             self.avoiding()
 
     def roaming(self):
-        speed = 1.0
-        turn_speed = 2.
+        speed = 0.8
+        turn_speed = 1.
         self.movement.move_forward(speed)
         self.movement.turn_left(turn_speed)
 
     def chase_object(self, distance, angle):
-        speed = min(distance * 0.5, 1.0)
+        speed = min(distance * 0.8, 1.0)
         turn_speed = angle/90
         self.movement.turn_left(turn_speed)
         self.movement.move_forward(speed)
