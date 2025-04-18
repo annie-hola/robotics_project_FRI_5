@@ -175,7 +175,8 @@ class SensorFSM(Node):
                 # Handle CLIFF or WHEEL_DROP hazards
                 if hazard.type in [HazardDetection.CLIFF, HazardDetection.WHEEL_DROP]:
                     self.get_logger().warn(f"Executing hazard handling.")
-                    self.behavior_logic.handle_hazard()
+                    # self.behavior_logic.handle_hazard()
+                    self.set_state(self.AVOIDING)
                     return
 
                 # Handle BUMP hazards
@@ -196,13 +197,11 @@ class SensorFSM(Node):
             led_color.blue = color["blue"]
             msg.leds.append(led_color)
 
-        print(f"Setting LED color: {msg.leds}")
         self.led_publisher.publish(msg)
 
     def set_state(self, state):
         if self.current_state == self.AVOIDING:
-            if time.time() - self.init_avoiding < 10:
-                self.get_logger().info(f"Staying to state: {self.current_state}")
+            if time.time() - self.init_avoiding < 2:
                 return
         elif state == self.AVOIDING:
             self.init_avoiding = time.time()
