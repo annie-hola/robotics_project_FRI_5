@@ -2,8 +2,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
 from irobot_create_msgs.msg import HazardDetectionVector, HazardDetection
-from irobot_create_msgs.msg import LightringLeds, LedColor
-from irobot_create_msgs.msg import IrIntensityVector
+from irobot_create_msgs.msg import IrIntensityVector, IrOpcode
 from irobot_create_msgs.action import Undock
 from irobot_create_msgs.action import Dock
 from rclpy.qos import qos_profile_sensor_data
@@ -37,14 +36,13 @@ class SensorFSM(Node):
         self.distance = 1000
         self.angle = 0
         self.init_avoiding = 0
+        self.see_dock = 0
         
         # Exploration timer to return to dock
         self.exploration_timer = None
-        self.exploration_duration = 60.0 # 3 mins
+        self.exploration_duration = 180.0 # 3 mins
         self.create_timer(1.0, self.check_exploration_timeout)
-        
-        self.led_publisher = self.create_publisher(LightringLeds, '/Robot5/cmd_lightring', 10)
-        
+                
     def intialize(self):
         self.get_logger().info("Initializing...")
         self.set_state(self.INITIALIZED)
@@ -136,6 +134,13 @@ class SensorFSM(Node):
             self.process_hazard_detection,
             qos_profile_sensor_data
         )
+
+        self.opcode = self.create_subscription(
+            IrOpcode,
+            '/Robot5/ir_opcode',
+            self.process_opcode,
+            qos_profile_sensor_data
+        )
  
     def process_lidar_data(self, msg):
         if self.current_state not in self.active_state:
@@ -143,17 +148,21 @@ class SensorFSM(Node):
         
         # Find closest object to the robot using IR sensors
         max_value = 0
-        max_id = "NULL"
+        max_reading = "NULL"
         for reading in msg.readings:
             value = reading.value
             if value >= max_value:
                 max_value = value
-                max_id = reading.header.frame_id
-        self.set_distance_angle(max_value, max_id)
+                max_reading = reading # reading.header.frame_id
+
+        self.set_distance_angle(max_value, max_reading.header.frame_id)
 
         # No object => max_value < 15
         if max_value > 20:  
-            self.set_state(self.CHASING)
+            if time.time() - self.see_dock < 2:
+                self.set_state(self.AVOIDING)
+            else:
+                self.set_state(self.CHASING)
         else:
             self.set_state(self.RANDOM_ROAMING)
             
@@ -174,20 +183,9 @@ class SensorFSM(Node):
                     self.get_logger().warn("Bump detected !")
                     self.set_state(self.AVOIDING)
                     return
-
-    def set_led_color(self, colors):
-        msg = LightringLeds()
-        msg.override_system = True
-        
-        led_color = LedColor()
-        led_color.red = colors["red"]
-        led_color.green = colors["green"]
-        led_color.blue = colors["blue"]
-
-        for _ in range(6):
-            msg.leds.append(led_color)
     
-        self.led_publisher.publish(msg)
+    def process_opcode(self, msg):
+        self.see_dock = time.time()
 
     def set_state(self, state):
         if self.current_state == self.AVOIDING:
@@ -198,17 +196,6 @@ class SensorFSM(Node):
         if self.current_state != state:
             self.current_state = state
             self.get_logger().info(f"Transitioning to state: {state}")
-        
-        if state == self.RANDOM_ROAMING:
-            self.set_led_color({"red": 0, "green": 255, "blue": 0})  # Green for RANDOM_ROAMING
-        elif state == self.CHASING:
-            self.set_led_color({"red": 255, "green": 0, "blue": 0})  # Red for CHASING
-        elif state == self.AVOIDING:
-            self.set_led_color({"red": 0, "green": 0, "blue": 255})  # Blue for AVOIDING
-        elif state == self.DOCKING:
-            self.set_led_color({"red": 255, "green": 255, "blue": 0})  # Yellow for DOCKING
-        else:
-            self.set_led_color({"red": 255, "green": 255, "blue": 255})  # White for other states
 
     def get_state(self):
         return self.current_state

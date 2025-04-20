@@ -6,8 +6,8 @@ class MovementControl(Node):
     def __init__(self):
         super().__init__('movement_control')
         self.get_logger().info("Movement Control Node Initialized")
-        self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
-        self.vel_sub = self.create_subscription(Twist, '/cmd_vel', self.process_velocity, qos_profile_sensor_data)
+        self.cmd_vel_pub = self.create_publisher(Twist, '/Robot5/cmd_vel', 10)
+        self.vel_sub = self.create_subscription(Twist, '/Robot5/cmd_vel', self.process_velocity, qos_profile_sensor_data)
         self.vel = Twist()
 
     def move_forward(self, speed):
