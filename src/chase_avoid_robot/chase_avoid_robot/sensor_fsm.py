@@ -1,8 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
-from sensor_msgs.msg import LaserScan
-from irobot_create_msgs.msg import InterfaceButtons, HazardDetectionVector, HazardDetection
+from irobot_create_msgs.msg import HazardDetectionVector, HazardDetection
 from irobot_create_msgs.msg import LightringLeds, LedColor
 from irobot_create_msgs.msg import IrIntensityVector
 from irobot_create_msgs.action import Undock
@@ -27,15 +26,13 @@ class SensorFSM(Node):
     RANDOM_ROAMING = 2
     CHASING = 3
     AVOIDING = 4
-    PUSHING = 5
-    DOCKING = 6
+    DOCKING = 5
 
     def __init__(self):
         super().__init__('sensor_fsm')
         self.get_logger().info("Sensor Control Node Initialized")
         self.current_state = self.UNINITIALIZED
-        self.active_state = [self.RANDOM_ROAMING, self.CHASING, self.AVOIDING, self.PUSHING]
-        self.mode = self.CHASING  # Default mode
+        self.active_state = [self.RANDOM_ROAMING, self.CHASING, self.AVOIDING]
         self.dir = "NULL"
         self.distance = 1000
         self.angle = 0
@@ -139,13 +136,12 @@ class SensorFSM(Node):
             self.process_hazard_detection,
             qos_profile_sensor_data
         )
-
-        
+ 
     def process_lidar_data(self, msg):
         if self.current_state not in self.active_state:
             return
         
-        # Ensure LiDAR data is valid and update state
+        # Find closest object to the robot using IR sensors
         max_value = 0
         max_id = "NULL"
         for reading in msg.readings:
@@ -155,8 +151,8 @@ class SensorFSM(Node):
                 max_id = reading.header.frame_id
         self.set_distance_angle(max_value, max_id)
 
-        if max_value > 20:
-            #self.get_logger().info(f"Lidar value, angle, distance: {max_value}, {self.angle}, {self.distance}")
+        # No object => max_value < 15
+        if max_value > 20:  
             self.set_state(self.CHASING)
         else:
             self.set_state(self.RANDOM_ROAMING)
@@ -167,21 +163,17 @@ class SensorFSM(Node):
         
         if msg.detections:
             for hazard in msg.detections:
-                #self.get_logger().warn(f"Hazard detected: {hazard.type}.")
-
                 # Handle CLIFF or WHEEL_DROP hazards
                 if hazard.type in [HazardDetection.CLIFF, HazardDetection.WHEEL_DROP]:
-                    self.get_logger().warn(f"Executing hazard handling.")
-                    # self.behavior_logic.handle_hazard()
+                    self.get_logger().warn(f"Void detected !")
                     self.set_state(self.AVOIDING)
                     return
 
                 # Handle BUMP hazards
                 elif hazard.type == HazardDetection.BUMP:
-                    self.get_logger().info("Bump detected. Switching to AVOIDING state.")
+                    self.get_logger().warn("Bump detected !")
                     self.set_state(self.AVOIDING)
                     return
-
 
     def set_led_color(self, colors):
         msg = LightringLeds()

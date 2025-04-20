@@ -1,4 +1,3 @@
-import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from rclpy.qos import qos_profile_sensor_data
@@ -7,13 +6,8 @@ class MovementControl(Node):
     def __init__(self):
         super().__init__('movement_control')
         self.get_logger().info("Movement Control Node Initialized")
-        self.cmd_vel_pub = self.create_publisher(Twist, '/Robot5/cmd_vel', 10)
-        self.vel_sub = self.create_subscription(
-            Twist,
-            '/Robot5/cmd_vel',
-            self.process_velocity,
-            qos_profile_sensor_data
-        )
+        self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.vel_sub = self.create_subscription(Twist, '/cmd_vel', self.process_velocity, qos_profile_sensor_data)
         self.vel = Twist()
 
     def move_forward(self, speed):
@@ -49,9 +43,6 @@ class MovementControl(Node):
         # Ensure robot stops completely
         msg = Twist()
         self.cmd_vel_pub.publish(msg)
-
-    def process_velocity(self, msg):
-        self.vel = msg
         
     def set_speed(self, speed):
         msg = Twist()
@@ -64,3 +55,6 @@ class MovementControl(Node):
         msg.linear.x = 0.0
         msg.angular.z = angular_speed
         self.cmd_vel_pub.publish(msg)
+
+    def process_velocity(self, msg):
+        self.vel = msg
