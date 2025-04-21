@@ -1,13 +1,22 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
-from sensor_msgs.msg import LaserScan
-from irobot_create_msgs.msg import InterfaceButtons, HazardDetection
-from irobot_create_msgs.msg import LightringLeds, LedColor
-from irobot_create_msgs.msg import IrIntensityVector
+from irobot_create_msgs.msg import HazardDetectionVector, HazardDetection
+from irobot_create_msgs.msg import IrIntensityVector, IrOpcode
 from irobot_create_msgs.action import Undock
 from irobot_create_msgs.action import Dock
 from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import QoSProfile, ReliabilityPolicy, LivelinessPolicy, DurabilityPolicy
+
+from enum import Enum
+import time
+
+qos_profile = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            liveliness=LivelinessPolicy.AUTOMATIC,
+            durability=DurabilityPolicy.VOLATILE,
+            depth=1
+        )
 
 from enum import Enum
 
@@ -34,18 +43,17 @@ class SensorFSM(Node):
         self.get_logger().info("Sensor Control Node Initialized")
         self.current_state = self.UNINITIALIZED
         self.active_state = [self.RANDOM_ROAMING, self.CHASING, self.AVOIDING]
-        self.mode = self.CHASING  # Default mode
         self.dir = "NULL"
         self.distance = 1000
         self.angle = 0
+        self.init_avoiding = 0
+        self.see_dock = 0
         
         # Exploration timer to return to dock
         self.exploration_timer = None
         self.exploration_duration = 180.0 # 3 mins
         self.create_timer(1.0, self.check_exploration_timeout)
-        
-        self.led_publisher = self.create_publisher(LightringLeds, '/Robot5/cmd_lightring', 10)
-        
+                
     def intialize(self):
         self.get_logger().info("Initializing...")
         self.set_state(self.INITIALIZED)
@@ -131,30 +139,40 @@ class SensorFSM(Node):
         )
 
         self.bumper_sub = self.create_subscription(
-            HazardDetection,
+            HazardDetectionVector,
             '/Robot5/hazard_detection',
             self.process_hazard_detection,
             qos_profile_sensor_data
         )
 
-        
+        self.opcode = self.create_subscription(
+            IrOpcode,
+            '/Robot5/ir_opcode',
+            self.process_opcode,
+            qos_profile_sensor_data
+        )
+ 
     def process_lidar_data(self, msg):
         if self.current_state not in self.active_state:
             return
         
-        # Ensure LiDAR data is valid and update state
+        # Find closest object to the robot using IR sensors
         max_value = 0
-        max_id = "NULL"
+        max_reading = "NULL"
         for reading in msg.readings:
             value = reading.value
             if value >= max_value:
                 max_value = value
-                max_id = reading.header.frame_id
-        self.set_distance_angle(max_value, max_id)
-        self.get_logger().info(f"Lidar value, angle, distance: {max_value}, {self.angle}, {self.distance}")
+                max_reading = reading # reading.header.frame_id
 
-        if max_value > 20:
-            self.set_state(self.AVOIDING if self.mode == self.AVOIDING else self.CHASING)
+        self.set_distance_angle(max_value, max_reading.header.frame_id)
+
+        # No object => max_value < 15
+        if max_value > 20:  
+            if time.time() - self.see_dock < 2:
+                self.set_state(self.AVOIDING)
+            else:
+                self.set_state(self.CHASING)
         else:
             self.set_state(self.RANDOM_ROAMING)
             
@@ -164,44 +182,30 @@ class SensorFSM(Node):
         
         if msg.detections:
             for hazard in msg.detections:
-                self.get_logger().warn(f"Hazard detected: {hazard.type}.")
-
                 # Handle CLIFF or WHEEL_DROP hazards
                 if hazard.type in [HazardDetection.CLIFF, HazardDetection.WHEEL_DROP]:
-                    self.get_logger().warn(f"Executing hazard handling.")
-                    self.behavior_logic.handle_hazard()
+                    self.get_logger().warn(f"Void detected !")
+                    self.set_state(self.AVOIDING)
                     return
 
                 # Handle BUMP hazards
                 elif hazard.type == HazardDetection.BUMP:
-                    self.get_logger().info("Bump detected. Switching to AVOIDING state.")
+                    self.get_logger().warn("Bump detected !")
                     self.set_state(self.AVOIDING)
                     return
-
-
-    def set_led_color(self, red, green, blue):
-        msg = LightringLeds()
-
-        color = LedColor()
-        color.red = int(red * 255)
-        color.green = int(green * 255)
-        color.blue = int(blue * 255)
-
-        msg.leds = [color] * 6 
-        self.led_publisher.publish(msg)  # Publish the message to the cmd_lightring topic
+    
+    def process_opcode(self, msg):
+        self.see_dock = time.time()
 
     def set_state(self, state):
-        self.get_logger().info(f"Transitioning to state: {state}")
-        self.current_state = state
-        
-        if state == self.RANDOM_ROAMING:
-            self.set_led_color(0.0, 1.0, 0.0)  # Green for RANDOM_ROAMING
-        elif state == self.CHASING:
-            self.set_led_color(1.0, 0.0, 0.0)  # Red for CHASING
+        if self.current_state == self.AVOIDING:
+            if time.time() - self.init_avoiding < 2:
+                return
         elif state == self.AVOIDING:
-            self.set_led_color(0.0, 0.0, 1.0)  # Blue for AVOIDING
-        else:
-            self.set_led_color(1.0, 1.0, 1.0)  # White for other states
+            self.init_avoiding = time.time()
+        if self.current_state != state:
+            self.current_state = state
+            self.get_logger().info(f"Transitioning to state: {state}")
 
     def get_state(self):
         return self.current_state

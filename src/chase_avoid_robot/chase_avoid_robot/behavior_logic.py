@@ -1,15 +1,14 @@
 from chase_avoid_robot.sensor_fsm import SensorFSM
 from chase_avoid_robot.movement_control import MovementControl
 import random
-import time
 
 class BehaviorLogic:
     def __init__(self, fsm: SensorFSM, movement: MovementControl):
         self.fsm = fsm
         self.movement = movement
-        self.roaming_mode = "forward"
-        self.roaming_start_time = time.time()
-        self.current_turn_direction = "left"
+        self.started_avoiding = False
+        self.started_roaming = False
+        self.turn_speed = 1.
 
     def execute_behavior(self):
         state = self.fsm.get_state()
@@ -17,97 +16,38 @@ class BehaviorLogic:
         if state == SensorFSM.RANDOM_ROAMING:
             self.roaming()
         elif state == SensorFSM.CHASING:
-            print("Should be chasing")
             angle = self.fsm.angle
             distance = self.fsm.distance
             self.chase_object(distance, angle)
-                # self.movement.move_forward(0.5)
         elif state == SensorFSM.AVOIDING:
             self.avoiding()
 
     def roaming(self):
-        now = time.time()
-        if self.roaming_mode == "turning":
-            if now - self.roaming_start_time < 1.5:
-                if not hasattr(self, 'turning_started') or not self.turning_started:
-                    if self.current_turn_direction == "left":
-                        self.movement.turn_left(1.0)
-                    else:
-                        self.movement.turn_right(1.0)
-                    self.turning_started = True 
-            else:
-                self.roaming_mode = "forward"
-                self.roaming_start_time = now
-                self.movement.stop()
-                self.turning_started = False
-
-        elif self.roaming_mode == "forward":
-            if now - self.roaming_start_time < 2.0:
-                if not hasattr(self, 'forward_started') or not self.forward_started:
-                    self.movement.move_forward(0.5)
-                    self.forward_started = True
-            else:
-                self.roaming_mode = "turning"
-                self.roaming_start_time = now
-                self.movement.stop()
-                self.current_turn_direction = random.choice(["left", "right"])
-                self.forward_started = False
+        """
+        Roam in circle
+        """
+        if not self.started_roaming:
+            self.started_roaming = True
+            self.turn_speed = random.random() + 0.2
+        speed = 0.2
+        self.movement.move_forward(speed)
+        self.movement.turn_left(self.turn_speed)
 
     def chase_object(self, distance, angle):
-        self.fsm.get_logger().info(f"Chasing: angle={angle:.2f}, distance={distance:.2f}")
-
-        speed = min(distance * 0.5, 1.0)
-
-        if abs(angle) < 5:
-            self.movement.set_speed(speed)
-            self.movement.set_turn(0.0)
-
-        elif abs(angle) < 20:
-            self.movement.set_speed(speed * 0.8) 
-            turn_speed = angle * 0.3             
-            self.movement.set_turn(turn_speed)
-
-        else:
-            self.movement.set_speed(0.0)          
-            turn_speed = angle * 0.6              
-            self.movement.set_turn(turn_speed)
-
+        """
+        Turn the robot toward the nearest object.
+        Adapt the speed with respect to the distance to the object
+        """
+        speed = min(distance*0.5 + 0.1, 1.0)
+        turn_speed = angle/90
+        self.movement.turn_left(turn_speed)
+        self.movement.move_forward(speed)
 
     def avoiding(self):
-        self.fsm.get_logger().info("Avoiding state")
-        direction = random.choice(['left', 'right'])
-        self.fsm.get_logger().debug(f"Avoiding: Moving backward and turning {direction}")
-
-        self.movement.move_backward(0.5)
-        time.sleep(1.5)
-        self.movement.stop()
-        if direction == 'left':
-            self.movement.turn_left(1.0)
-        else:
-            self.movement.turn_right(1.0)
-        time.sleep(1.0)
-        self.movement.stop()
-        self.movement.move_forward(0.6)
-        time.sleep(2.0)
-        self.movement.stop()
-        
-    def handle_hazard(self):
-            self.fsm.get_logger().info("Handling hazard...")
-            self.movement.stop()
-
-            # Move backward to avoid the hazard
-            self.movement.move_backward(0.3)
-            time.sleep(1.5)
-            self.movement.stop()
-
-            # Turn away from the hazard
-            direction = random.choice(['left', 'right'])
-            if direction == 'left':
-                self.movement.turn_left(1.0)
-            else:
-                self.movement.turn_right(1.0)
-            time.sleep(1.0)
-            self.movement.stop()
-
-            # Resume roaming after avoiding the hazard
-            self.fsm.set_state(SensorFSM.RANDOM_ROAMING)
+        """
+        Make a random turn to move in the opposite direction
+        """
+        if not self.started_avoiding:
+            self.started_avoiding = True
+            self.turn_speed = random.random() + 1.
+        self.movement.set_turn(self.turn_speed)
