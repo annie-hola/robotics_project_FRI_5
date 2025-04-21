@@ -117,6 +117,6 @@ chase_avoid_robot/
 ## Contributors
 - HA Kieu Anh
 - DENIEL Théo
-- Mariia Soltys
-- Kaidiliya Dilixiati
+- SOLTYS Mariia 
+- DILIXIATI Kaidiliya
 
