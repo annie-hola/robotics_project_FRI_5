@@ -66,7 +66,7 @@ class SensorFSM(Node):
         self.set_state(self.DOCKING)
 
         # Navigate to the docking station
-        navigate_client = ActionClient(self, NavigateToPosition, '/navigate_to_position')
+        navigate_client = ActionClient(self, NavigateToPosition, '/Robot5/navigate_to_position')
 
         self.get_logger().info("Waiting for NavigateToPosition action server...")
         if not navigate_client.wait_for_server(timeout_sec=10.0):
@@ -92,27 +92,11 @@ class SensorFSM(Node):
             self.execute_dock_action()  # Skip navigation and directly attempt docking
             return
 
-        if not future.result().accepted: # Check if the goal was rejected
-            self.get_logger().error("NavigateToPosition goal was rejected!")
-            self.perform_dock()
-            return 
-        print("3")
-
-        result_future = future.result().get_result_async()
-        rclpy.spin_until_future_complete(self, result_future)
-        print("4")
-
-        if result_future.result().status != 4:  # 4 = SUCCEEDED -> NOT SUCCEEDED
-            self.perform_dock()
-            return
-        else:
-            self.get_logger().info("NavigateToPosition succeeded!")
-        
-        # Proceed to dock action regardless of navigation success
+        time.sleep(20)
         self.execute_dock_action()
     
     def execute_dock_action(self):
-        dock_client = ActionClient(self, Dock, '/dock')
+        dock_client = ActionClient(self, Dock, '/Robot5/dock')
 
         self.get_logger().info("Waiting for Dock action server...")
         if not dock_client.wait_for_server(timeout_sec=10.0):
@@ -138,7 +122,7 @@ class SensorFSM(Node):
     def perform_undock(self):
         self.set_state(self.UNDOCK)
 
-        undock_client = ActionClient(self, Undock, '/undock')
+        undock_client = ActionClient(self, Undock, '/Robot5/undock')
 
         self.get_logger().info("Waiting for Undock action server...")
         if not undock_client.wait_for_server(timeout_sec=10.0):
@@ -170,21 +154,21 @@ class SensorFSM(Node):
     def initialize_subscriptions(self):
         self.lidar_sub = self.create_subscription(
             IrIntensityVector,
-            '/ir_intensity',
+            '/Robot5/ir_intensity',
             self.process_lidar_data,
             qos_profile_sensor_data
         )
 
         self.bumper_sub = self.create_subscription(
             HazardDetectionVector,
-            '/hazard_detection',
+            '/Robot5/hazard_detection',
             self.process_hazard_detection,
             qos_profile_sensor_data
         )
 
         self.opcode = self.create_subscription(
             IrOpcode,
-            '/ir_opcode',
+            '/Robot5/ir_opcode',
             self.process_opcode,
             qos_profile_sensor_data
         )
