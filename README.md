@@ -4,6 +4,8 @@
 
 This project involves programming an iRobot Create® 3 to explore a tabletop, detect objects, and push them off the table while avoiding hazards like cliffs and the dock. The robot uses a Finite State Machine (FSM) to manage its behavior, transitioning between states such as roaming, chasing, avoiding, and pushing.
 
+Our slides available in this [link](https://docs.google.com/presentation/d/1wqL3F1s97yaeExnx8migyhF6UZM9Uc-kJlXCrEvAmGI/edit?usp=sharing)
+
 ## Project Idea
 
 ### Objective:
