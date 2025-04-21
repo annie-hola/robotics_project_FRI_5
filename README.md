@@ -87,7 +87,7 @@ ros2 run chase_avoid_robot chase_avoid_robot
    - Managing smooth transitions between states.
    - Avoiding getting stuck in certain states (e.g., `AVOIDING`).
 
-2.**Simulation Setup**:
+2. **Simulation Setup**:
    - Setting up a simulation environment for the iRobot Create® 3 in ROS 2 was challenging due to:
      - Limited documentation for integrating the robot's specific sensors and actuators.
      - Differences between simulated and real-world behavior, requiring additional calibration and testing.
@@ -108,10 +108,6 @@ chase_avoid_robot/
 ├── resource/
 │   └── chase_avoid_robot
 ├── test/
-│   ├── test_sensor_fsm.py
-│   ├── test_movement_control.py
-│   ├── test_behavior_logic.py
-│   └── test_integration.py
 ```
 
 ## Contributors
