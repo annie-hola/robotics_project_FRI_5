@@ -1,26 +1,24 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
-from sensor_msgs.msg import LaserScan
-from irobot_create_msgs.msg import InterfaceButtons, HazardDetectionVector, HazardDetection
-from irobot_create_msgs.msg import LightringLeds, LedColor
-from irobot_create_msgs.msg import IrIntensityVector
+from irobot_create_msgs.msg import HazardDetectionVector, HazardDetection
+from irobot_create_msgs.msg import IrIntensityVector, IrOpcode
 from irobot_create_msgs.action import Undock
 from irobot_create_msgs.action import Dock
+from irobot_create_msgs.action import NavigateToPosition
 from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import QoSProfile, ReliabilityPolicy, LivelinessPolicy, DurabilityPolicy
 
 from enum import Enum
 import time
 
-# Enumerating the states of the FSM
-class State(Enum):
-    UNINITIALIZED= -1
-    INITIALIZED = 0
-    UNDOCK = 1
-    RANDOM_ROAMING = 2
-    CHASING = 3
-    AVOIDING = 4
-    DOCKING = 5 
+qos_profile = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            liveliness=LivelinessPolicy.AUTOMATIC,
+            durability=DurabilityPolicy.VOLATILE,
+            depth=1
+        )
+
 class SensorFSM(Node):
     UNINITIALIZED= -1
     INITIALIZED = 0
@@ -29,26 +27,23 @@ class SensorFSM(Node):
     CHASING = 3
     AVOIDING = 4
     DOCKING = 5
-    START_AVOIDING = 6
 
     def __init__(self):
         super().__init__('sensor_fsm')
         self.get_logger().info("Sensor Control Node Initialized")
         self.current_state = self.UNINITIALIZED
         self.active_state = [self.RANDOM_ROAMING, self.CHASING, self.AVOIDING]
-        self.mode = self.CHASING  # Default mode
         self.dir = "NULL"
         self.distance = 1000
         self.angle = 0
         self.init_avoiding = 0
+        self.see_dock = 0
         
         # Exploration timer to return to dock
         self.exploration_timer = None
-        self.exploration_duration = 180.0 # 3 mins
+        self.exploration_duration = 60.0 # 3 mins
         self.create_timer(1.0, self.check_exploration_timeout)
-        
-        self.led_publisher = self.create_publisher(LightringLeds, '/Robot5/cmd_lightring', 10)
-        
+                
     def intialize(self):
         self.get_logger().info("Initializing...")
         self.set_state(self.INITIALIZED)
@@ -66,12 +61,53 @@ class SensorFSM(Node):
                 elapsed_time = (self.get_clock().now() - self.exploration_start_time).nanoseconds * 1e-9
                 if elapsed_time > self.exploration_duration:
                     self.perform_dock()
-    
+
     def perform_dock(self):
         self.set_state(self.DOCKING)
+
+        # Navigate
+        navigate_client = ActionClient(self, NavigateToPosition, '/navigate_to_position')
+
+        self.get_logger().info("Waiting for NavigateToPosition action server...")
+        if not navigate_client.wait_for_server(timeout_sec=10.0):
+            self.get_logger().error("NavigateToPosition action server not available!")
+            self.perform_dock() # Retry docking
+            return  
+
+        goal_msg = NavigateToPosition.Goal()
+        goal_msg.achieve_goal_heading = True
+        goal_msg.goal_pose.pose.position.x = -0.15
+        goal_msg.goal_pose.pose.position.y = 0.
+        goal_msg.goal_pose.pose.position.z = 0.
+        goal_msg.goal_pose.pose.orientation.x = 0.
+        goal_msg.goal_pose.pose.orientation.y = 0.
+        goal_msg.goal_pose.pose.orientation.z = 0.
+        goal_msg.goal_pose.pose.orientation.w = 1.
+        future = navigate_client.send_goal_async(goal_msg)
+
+        print("1")
+        rclpy.spin_until_future_complete(self, future)
+        print("2")
+
+        if not future.result().accepted: # Check if the goal was rejected
+            self.get_logger().error("NavigateToPosition goal was rejected!")
+            self.perform_dock() # Retry docking
+            return 
+        print("3")
+
+        result_future = future.result().get_result_async()
+        rclpy.spin_until_future_complete(self, result_future)
+        print("4")
+
+        if result_future.result().status != 4:  # 4 = SUCCEEDED -> NOT SUCCEEDED
+            self.perform_dock()  # Retry undocking
+            return
+        else:
+            self.get_logger().info("NavigateToPosition succeeded!")
         
-        dock_client = ActionClient(self, Dock, '/Robot5/dock')
-        
+        # Dock
+        dock_client = ActionClient(self, Dock, '/dock')
+
         self.get_logger().info("Waiting for Dock action server...")
         if not dock_client.wait_for_server(timeout_sec=10.0):
             self.get_logger().error("Dock action server not available!")
@@ -96,7 +132,7 @@ class SensorFSM(Node):
     def perform_undock(self):
         self.set_state(self.UNDOCK)
 
-        undock_client = ActionClient(self, Undock, '/Robot5/undock')
+        undock_client = ActionClient(self, Undock, '/undock')
 
         self.get_logger().info("Waiting for Undock action server...")
         if not undock_client.wait_for_server(timeout_sec=10.0):
@@ -128,36 +164,46 @@ class SensorFSM(Node):
     def initialize_subscriptions(self):
         self.lidar_sub = self.create_subscription(
             IrIntensityVector,
-            '/Robot5/ir_intensity',
+            '/ir_intensity',
             self.process_lidar_data,
             qos_profile_sensor_data
         )
 
         self.bumper_sub = self.create_subscription(
             HazardDetectionVector,
-            '/Robot5/hazard_detection',
+            '/hazard_detection',
             self.process_hazard_detection,
             qos_profile_sensor_data
         )
 
-        
+        self.opcode = self.create_subscription(
+            IrOpcode,
+            '/ir_opcode',
+            self.process_opcode,
+            qos_profile_sensor_data
+        )
+ 
     def process_lidar_data(self, msg):
         if self.current_state not in self.active_state:
             return
         
-        # Ensure LiDAR data is valid and update state
+        # Find closest object to the robot using IR sensors
         max_value = 0
-        max_id = "NULL"
+        max_reading = "NULL"
         for reading in msg.readings:
             value = reading.value
             if value >= max_value:
                 max_value = value
-                max_id = reading.header.frame_id
-        self.set_distance_angle(max_value, max_id)
+                max_reading = reading # reading.header.frame_id
 
-        if max_value > 20:
-            #self.get_logger().info(f"Lidar value, angle, distance: {max_value}, {self.angle}, {self.distance}")
-            self.set_state(self.CHASING)
+        self.set_distance_angle(max_value, max_reading.header.frame_id)
+
+        # No object => max_value < 15
+        if max_value > 20:  
+            if time.time() - self.see_dock < 2:
+                self.set_state(self.AVOIDING)
+            else:
+                self.set_state(self.CHASING)
         else:
             self.set_state(self.RANDOM_ROAMING)
             
@@ -167,51 +213,30 @@ class SensorFSM(Node):
         
         if msg.detections:
             for hazard in msg.detections:
-                #self.get_logger().warn(f"Hazard detected: {hazard.type}.")
-
                 # Handle CLIFF or WHEEL_DROP hazards
                 if hazard.type in [HazardDetection.CLIFF, HazardDetection.WHEEL_DROP]:
-                    self.get_logger().warn(f"Executing hazard handling.")
-                    self.behavior_logic.handle_hazard()
+                    self.get_logger().warn(f"Void detected !")
+                    self.set_state(self.AVOIDING)
                     return
 
                 # Handle BUMP hazards
                 elif hazard.type == HazardDetection.BUMP:
-                    self.get_logger().info("Bump detected. Switching to AVOIDING state.")
+                    self.get_logger().warn("Bump detected !")
                     self.set_state(self.AVOIDING)
                     return
-
-
-    def set_led_color(self, red, green, blue):
-        msg = LightringLeds()
-
-        color = LedColor()
-        color.red = int(red * 255)
-        color.green = int(green * 255)
-        color.blue = int(blue * 255)
-
-        msg.leds = [color] * 6 
-        self.led_publisher.publish(msg)  # Publish the message to the cmd_lightring topic
+    
+    def process_opcode(self, msg):
+        self.see_dock = time.time()
 
     def set_state(self, state):
         if self.current_state == self.AVOIDING:
-            if time.time() - self.init_avoiding < 10:
-                self.get_logger().info(f"Staying to state: {self.current_state}")
+            if time.time() - self.init_avoiding < 2:
                 return
         elif state == self.AVOIDING:
             self.init_avoiding = time.time()
         if self.current_state != state:
             self.current_state = state
             self.get_logger().info(f"Transitioning to state: {state}")
-        
-        if state == self.RANDOM_ROAMING:
-            self.set_led_color(0.0, 1.0, 0.0)  # Green for RANDOM_ROAMING
-        elif state == self.CHASING:
-            self.set_led_color(1.0, 0.0, 0.0)  # Red for CHASING
-        elif state == self.AVOIDING:
-            self.set_led_color(0.0, 0.0, 1.0)  # Blue for AVOIDING
-        else:
-            self.set_led_color(1.0, 1.0, 1.0)  # White for other states
 
     def get_state(self):
         return self.current_state

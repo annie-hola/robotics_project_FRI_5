@@ -9,7 +9,6 @@ def main(args=None):
     fsm = SensorFSM() # Initialize the state machine
     movement = MovementControl() # Initialize the movement control
     behavior = BehaviorLogic(fsm, movement) # Initialize the behavior logic
-    fsm.behavior_logic = behavior
     fsm.intialize()
     
     try:
