@@ -5,6 +5,7 @@ from irobot_create_msgs.msg import HazardDetectionVector, HazardDetection
 from irobot_create_msgs.msg import IrIntensityVector, IrOpcode
 from irobot_create_msgs.action import Undock
 from irobot_create_msgs.action import Dock
+from irobot_create_msgs.action import NavigateToPosition
 from rclpy.qos import qos_profile_sensor_data
 from rclpy.qos import QoSProfile, ReliabilityPolicy, LivelinessPolicy, DurabilityPolicy
 
@@ -18,17 +19,6 @@ qos_profile = QoSProfile(
             depth=1
         )
 
-from enum import Enum
-
-# Enumerating the states of the FSM
-class State(Enum):
-    UNINITIALIZED= -1
-    INITIALIZED = 0
-    UNDOCK = 1
-    RANDOM_ROAMING = 2
-    CHASING = 3
-    AVOIDING = 4
-    DOCKING = 5 
 class SensorFSM(Node):
     UNINITIALIZED= -1
     INITIALIZED = 0
@@ -51,7 +41,7 @@ class SensorFSM(Node):
         
         # Exploration timer to return to dock
         self.exploration_timer = None
-        self.exploration_duration = 180.0 # 3 mins
+        self.exploration_duration = 60.0 # 3 mins
         self.create_timer(1.0, self.check_exploration_timeout)
                 
     def intialize(self):
@@ -71,29 +61,60 @@ class SensorFSM(Node):
                 elapsed_time = (self.get_clock().now() - self.exploration_start_time).nanoseconds * 1e-9
                 if elapsed_time > self.exploration_duration:
                     self.perform_dock()
-    
+
     def perform_dock(self):
         self.set_state(self.DOCKING)
-        
+
+        # Navigate to the docking station
+        navigate_client = ActionClient(self, NavigateToPosition, '/Robot5/navigate_to_position')
+
+        self.get_logger().info("Waiting for NavigateToPosition action server...")
+        if not navigate_client.wait_for_server(timeout_sec=10.0):
+            self.get_logger().error("NavigateToPosition action server not available!")
+            self.perform_dock() # Retry docking
+            return  
+
+        goal_msg = NavigateToPosition.Goal()
+        goal_msg.achieve_goal_heading = True
+        goal_msg.goal_pose.pose.position.x = -0.15
+        goal_msg.goal_pose.pose.position.y = 0.
+        goal_msg.goal_pose.pose.position.z = 0.
+        goal_msg.goal_pose.pose.orientation.x = 0.
+        goal_msg.goal_pose.pose.orientation.y = 0.
+        goal_msg.goal_pose.pose.orientation.z = 0.
+        goal_msg.goal_pose.pose.orientation.w = 1.
+        future = navigate_client.send_goal_async(goal_msg)
+
+        try:
+            rclpy.spin_until_future_complete(self, future, timeout_sec=10.0)
+        except Exception as e:
+            self.get_logger().error(f"Error while waiting for NavigateToPosition goal result: {e}")
+            self.execute_dock_action()  # Skip navigation and directly attempt docking
+            return
+
+        time.sleep(20)
+        self.execute_dock_action()
+    
+    def execute_dock_action(self):
         dock_client = ActionClient(self, Dock, '/Robot5/dock')
-        
+
         self.get_logger().info("Waiting for Dock action server...")
         if not dock_client.wait_for_server(timeout_sec=10.0):
             self.get_logger().error("Dock action server not available!")
             return
-    
+
         goal_msg = Dock.Goal()
         future = dock_client.send_goal_async(goal_msg)
 
-        rclpy.spin_until_future_complete(self, future) # Wait for the goal to be accepted
+        rclpy.spin_until_future_complete(self, future) 
         if not future.result().accepted:
             self.get_logger().error("Dock goal was rejected!")
             return
 
         result_future = future.result().get_result_async()
-        rclpy.spin_until_future_complete(self, result_future) # Wait for the result
+        rclpy.spin_until_future_complete(self, result_future)  # Wait for the result
 
-        if result_future.result().status == 4:
+        if result_future.result().status == 4:  # 4 = SUCCEEDED
             self.get_logger().info("Docking succeeded!")
         else:
             self.get_logger().error("Docking failed!")
@@ -115,7 +136,7 @@ class SensorFSM(Node):
         rclpy.spin_until_future_complete(self, future)
         if not future.result().accepted: # Check if the goal was rejected
             self.get_logger().error("Undock goal was rejected!")
-            self.perform_undock() # Retry undocking
+            self.perform_dock() # dock if undock is rejected
             return 
 
         result_future = future.result().get_result_async()
@@ -151,7 +172,7 @@ class SensorFSM(Node):
             self.process_opcode,
             qos_profile_sensor_data
         )
- 
+
     def process_lidar_data(self, msg):
         if self.current_state not in self.active_state:
             return

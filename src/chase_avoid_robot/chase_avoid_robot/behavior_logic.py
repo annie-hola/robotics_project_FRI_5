@@ -12,7 +12,6 @@ class BehaviorLogic:
 
     def execute_behavior(self):
         state = self.fsm.get_state()
-        self.fsm.get_logger().debug(f"Executing behavior for state: {state}")
         if state == SensorFSM.RANDOM_ROAMING:
             self.roaming()
         elif state == SensorFSM.CHASING:
